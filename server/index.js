@@ -74,15 +74,29 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve static frontend files in production
+// Serve static frontend files in production if dist exists (e.g. monolithic deploy)
 if (process.env.NODE_ENV === 'production') {
   const path = require('path');
-  app.use(express.static(path.join(__dirname, '../client/dist')));
+  const fs = require('fs');
+  const clientDistPath = path.join(__dirname, '../client/dist');
   
-  // Send all non-API requests to the React app
-  app.get(/^(?!\/api).*/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-  });
+  if (fs.existsSync(clientDistPath)) {
+    app.use(express.static(clientDistPath));
+    // Send all non-API requests to the React app
+    app.get(/^(?!\/api).*/, (req, res) => {
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    });
+  } else {
+    // Standalone API server mode (Render/API host)
+    app.get('/', (req, res) => {
+      res.json({
+        status: 'online',
+        platform: 'BrandVox AI',
+        message: 'BrandVox AI Backend API Server is running.',
+        health: '/api/health'
+      });
+    });
+  }
 }
 
 // Route fallback for 404 (API routes)
