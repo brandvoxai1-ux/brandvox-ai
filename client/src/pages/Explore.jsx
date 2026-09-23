@@ -3,10 +3,12 @@ import React, { useState, useEffect } from 'react';
 import Topbar from '../components/layout/Topbar';
 import VideoCard from '../components/shared/VideoCard';
 import { supabase } from '../lib/supabase';
+import { useModels } from '../hooks/useModels';
 import { Search, Compass, Cpu, Film, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Explore() {
+  const { models } = useModels();
   const [publicVideos, setPublicVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,9 +88,9 @@ export default function Explore() {
               className="bg-surface-elevated text-white border border-white/10 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none"
             >
               <option value="all">All Models</option>
-              <option value="seedance-2-fast">Seedance Fast</option>
-              <option value="seedance-2">Seedance Quality</option>
-              <option value="wan-2-2">WAN 2.2</option>
+              {models.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
             </select>
           </div>
         </div>

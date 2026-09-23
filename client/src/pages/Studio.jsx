@@ -1,5 +1,6 @@
 // client/src/pages/Studio.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useGeneration } from '../hooks/useGeneration';
 import { useModels } from '../hooks/useModels';
@@ -10,6 +11,7 @@ import Topbar from '../components/layout/Topbar';
 import ModelCard from '../components/shared/ModelCard';
 import VideoCard from '../components/shared/VideoCard';
 import CreditDisplay from '../components/shared/CreditDisplay';
+import ImageUploader from '../components/shared/ImageUploader';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -17,51 +19,85 @@ import { Select } from '../components/ui/Input';
 import {
   Film,
   Sparkles,
-  Upload,
   Play,
   Settings,
   HelpCircle,
   Clock,
-  Volume2,
-  VolumeX,
   X,
   RefreshCw,
-  FolderOpen
+  FolderOpen,
+  Search,
+  ChevronRight,
+  Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Studio() {
+  const location = useLocation();
   const { profile, refreshProfile } = useAuth();
   const { models } = useModels();
   const { buyCredits } = useCredits();
   const {
     createGeneration,
+    createImageGeneration,
     getStatus,
     deleteGeneration,
     updateGeneration
   } = useGeneration();
 
   // Left panel states
-  const [activeMode, setActiveMode] = useState('text'); // 'text' | 'image' | 'reference'
+  const [activeMode, setActiveMode] = useState('video'); // 'video' | 'image'
   const [selectedModel, setSelectedModel] = useState(null);
   const [resolution, setResolution] = useState('720p');
   const [aspectRatio, setAspectRatio] = useState('16:9');
-  const [duration, setDuration] = useState(10);
-  const [audioOn, setAudioOn] = useState(true);
+  const [duration, setDuration] = useState(6);
+  const [modelSearch, setModelSearch] = useState('');
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const modelPickerRef = useRef(null);
   const [imageUrl, setImageUrl] = useState('');
 
   // Topbar and Canvas state
   const [projectTitle, setProjectTitle] = useState('My BrandVox Reel');
   const [activeCanvasTab, setActiveCanvasTab] = useState('editor'); // 'editor' | 'queue' | 'history'
 
+  // Close model picker on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (modelPickerRef.current && !modelPickerRef.current.contains(e.target)) {
+        setModelPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   // Prompt Area state
   const [promptText, setPromptText] = useState('');
   const promptRef = useRef(null);
 
+  // Handle incoming template preloading from /templates
+  useEffect(() => {
+    if (location.state?.template) {
+      const t = location.state.template;
+      if (t.prompt) setPromptText(t.prompt);
+      if (t.aspect_ratio) setAspectRatio(t.aspect_ratio);
+      if (t.duration) setDuration(t.duration);
+      if (t.media_type) setActiveMode(t.media_type);
+      if (t.model_id && models.length > 0) {
+        const found = models.find(m => m.id === t.model_id || m.fal_endpoint === t.model_id);
+        if (found) setSelectedModel(found);
+      }
+      toast.success(`✨ Loaded template: "${t.title || 'Creative Preset'}"`);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, models]);
+
   // Active playing video (Editor Canvas)
   const [activeVideo, setActiveVideo] = useState(null);
   
-  // Background monitoring for processing jobs
+  // Active image generation result (image mode)
+  const [activeImageUrl, setActiveImageUrl] = useState(null);
+  const [imageGenerating, setImageGenerating] = useState(false);
   const [activeGenerationId, setActiveGenerationId] = useState(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState('idle'); // 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
@@ -129,9 +165,22 @@ export default function Studio() {
     loadStudioData();
   }, [profile?.id, generationStatus]);
 
+  // Auto select model when mode changes if current selected model doesn't match mode
+  useEffect(() => {
+    if (models.length > 0) {
+      const modeModels = models.filter(m => (activeMode === 'image' ? m.model_type === 'image' : m.model_type !== 'image'));
+      if (modeModels.length > 0 && (!selectedModel || selectedModel.model_type !== (activeMode === 'image' ? 'image' : 'video'))) {
+        setSelectedModel(modeModels[0]);
+      }
+    }
+  }, [activeMode, models]);
+
   // Cost calculation
   const getEstimatedCost = () => {
     if (!selectedModel) return 0;
+    if (selectedModel.model_type === 'image') {
+      return parseFloat(selectedModel.base_cost || 5);
+    }
     return duration * parseFloat(selectedModel.price_per_second);
   };
 
@@ -200,8 +249,8 @@ export default function Studio() {
       return;
     }
 
-    if (activeMode === 'image' && !imageUrl) {
-      toast.error('Input image URL is required for Image-to-Video mode.');
+    if (activeMode === 'video' && imageUrl && !selectedModel?.supports_image_input) {
+      toast.error('The selected model does not support image input. Remove the image or switch to an image-to-video model.');
       return;
     }
 
@@ -210,6 +259,30 @@ export default function Studio() {
       return;
     }
 
+    // IMAGE MODE — call synchronous image endpoint
+    if (activeMode === 'image') {
+      try {
+        setImageGenerating(true);
+        setActiveImageUrl(null);
+        const res = await createImageGeneration({
+          prompt: promptText,
+          model_id: selectedModel.id,
+          aspect_ratio: aspectRatio
+        });
+        if (res.success && res.image_url) {
+          setActiveImageUrl(res.image_url);
+          await refreshProfile();
+          toast.success('Image generated!');
+        }
+      } catch (err) {
+        toast.error(err.message || 'Image generation failed.');
+      } finally {
+        setImageGenerating(false);
+      }
+      return;
+    }
+
+    // VIDEO MODE
     try {
       setGenerationStatus('pending');
       setGenerationError('');
@@ -221,8 +294,8 @@ export default function Studio() {
         duration: duration,
         resolution: resolution,
         aspect_ratio: aspectRatio,
-        generate_audio: audioOn,
-        image_url: activeMode === 'image' ? imageUrl : null
+        generate_audio: !!selectedModel?.supports_audio,
+        image_url: imageUrl || null
       };
 
       const res = await createGeneration(payload);
@@ -254,81 +327,204 @@ export default function Studio() {
     };
     window.addEventListener('keydown', handleShortcuts);
     return () => window.removeEventListener('keydown', handleShortcuts);
-  }, [promptText, selectedModel, duration, resolution, aspectRatio, audioOn, imageUrl, insufficientCredits]);
+  }, [promptText, selectedModel, duration, resolution, aspectRatio, imageUrl, insufficientCredits]);
 
   return (
     <div className="flex flex-grow h-screen overflow-hidden bg-darkBg text-white">
       
       {/* PANEL 2: LEFT CONTROL PANEL (220px wide) */}
-      <aside className="hidden lg:flex flex-col w-56 bg-surface border-r border-white/5 p-4 overflow-y-auto shrink-0 select-none justify-between space-y-6">
+      <aside className="hidden lg:flex flex-col w-56 bg-surface border-r border-white/5 p-4 overflow-y-auto shrink-0 select-none justify-between space-y-6 relative">
         <div className="space-y-5">
-          {/* Mode Switchers */}
+          {/* Top-level creator mode: Video | Image */}
           <div className="flex bg-surface-elevated p-0.5 rounded-lg border border-white/5 text-[10px] font-bold uppercase tracking-wider">
-            {['text', 'image'].map((m) => (
+            {[
+              { id: 'video', label: 'Video', icon: Film },
+              { id: 'image', label: 'Image', icon: Sparkles }
+            ].map(({ id, label, icon: Icon }) => (
               <button
-                key={m}
-                onClick={() => setActiveMode(m)}
-                className={`flex-1 py-1.5 rounded-md transition-all ${
-                  activeMode === m ? 'bg-primary text-white shadow-xs' : 'text-white/40'
+                key={id}
+                onClick={() => { setActiveMode(id); setImageUrl(''); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md transition-all ${
+                  activeMode === id ? 'bg-primary text-white shadow-xs' : 'text-white/40 hover:text-white/60'
                 }`}
               >
-                {m}
+                <Icon className="w-3 h-3" />
+                {label}
               </button>
             ))}
           </div>
 
-          {/* Model selector list */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Select AI Model</label>
-            <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-              {models.map((model) => (
-                <ModelCard
-                  key={model.id}
-                  model={model}
-                  selected={selectedModel?.id === model.id}
-                  onClick={() => setSelectedModel(model)}
-                />
-              ))}
-            </div>
-          </div>
+          {/* MEDIA UPLOAD — Only in Video mode */}
+          {activeMode === 'video' && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Media</label>
+                {imageUrl && (
+                  <button
+                    onClick={() => setImageUrl('')}
+                    className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
 
-          {/* Source Image upload for Image Tab */}
-          {activeMode === 'image' && (
-            <div className="space-y-2 bg-surface-elevated p-3 rounded-xl border border-white/5">
-              <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Source Image URL</label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  placeholder="https://image-link.com/photo.png"
+              {imageUrl ? (
+                /* Preview of attached image */
+                <div className="relative rounded-xl overflow-hidden border border-white/8 aspect-video bg-black">
+                  <img src={imageUrl} alt="Source" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => setImageUrl('')}
+                    className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-error transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  <div className="absolute bottom-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded text-[9px] font-bold text-white/70 uppercase tracking-wider">
+                    Image→Video
+                  </div>
+                </div>
+              ) : (
+                /* Upload zone */
+                <ImageUploader
                   value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="bg-surface text-xs rounded-lg px-2.5 py-1.5 border border-white/10 w-full focus:outline-none focus:border-primary text-white/80"
+                  onUrlReady={(url) => setImageUrl(url)}
+                  onClear={() => setImageUrl('')}
+                  compact
                 />
-              </div>
-              <div className="flex items-center justify-center p-4 border border-dashed border-white/10 rounded-lg text-white/30 text-[10px] uppercase font-bold mt-2">
-                <Upload className="w-4 h-4 mr-1.5" />
-                <span>Image linked</span>
-              </div>
+              )}
             </div>
           )}
 
-          {/* Output settings */}
+          {/* MODEL SELECTOR — Available in both Video and Image modes */}
+          <div className="space-y-1.5" ref={modelPickerRef}>
+            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Model</label>
+
+            {/* Trigger row */}
+            <button
+              onClick={() => setModelPickerOpen(o => !o)}
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border transition-all cursor-pointer group ${
+                modelPickerOpen
+                  ? 'bg-white/8 border-primary/40 ring-1 ring-primary/20'
+                  : 'bg-white/5 border-white/8 hover:bg-white/8 hover:border-white/15'
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-md bg-primary/20 text-primary-hover flex items-center justify-center shrink-0">
+                  <Sparkles className="w-3 h-3" />
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-[11px] font-bold text-white truncate leading-none">
+                    {selectedModel ? selectedModel.name : 'Select a model'}
+                  </p>
+                  {selectedModel && (
+                    <p className="text-[9px] text-white/40 font-bold mt-0.5 uppercase tracking-wider">
+                      {selectedModel.model_type === 'image'
+                        ? `₹${selectedModel.base_cost} per image`
+                        : `${selectedModel.supported_resolutions?.slice(-1)[0]?.toUpperCase()} · 4s–${selectedModel.max_duration}s`
+                      }
+                    </p>
+                  )}
+                </div>
+              </div>
+              <ChevronRight className={`w-3.5 h-3.5 text-white/30 transition-transform shrink-0 ${
+                modelPickerOpen ? 'rotate-90' : ''
+              }`} />
+            </button>
+
+            {/* Floating dropdown */}
+            {modelPickerOpen && (
+              <div className="absolute left-0 right-0 z-50 mx-2 bg-[#141414] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="p-2.5 border-b border-white/5">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30" />
+                    <input
+                      type="text"
+                      placeholder="Search models..."
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                      autoFocus
+                      className="w-full pl-7 pr-3 py-1.5 bg-white/5 border border-white/8 rounded-lg text-[10px] text-white/80 placeholder-white/30 focus:outline-none focus:border-primary/40 transition-colors"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
+                  <Sparkles className="w-2.5 h-2.5 text-primary/50" />
+                  <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">
+                    {activeMode === 'image' ? 'Image Models' : 'Video Models'}
+                  </span>
+                </div>
+                <div className="pb-2 max-h-60 overflow-y-auto">
+                  {models
+                    .filter(m => (activeMode === 'image' ? m.model_type === 'image' : (m.model_type || 'video') !== 'image'))
+                    .filter(m => !modelSearch || m.name.toLowerCase().includes(modelSearch.toLowerCase()))
+                    .map((model) => {
+                      const isSelected = selectedModel?.id === model.id;
+                      const topRes = model.supported_resolutions?.slice(-1)[0]?.toUpperCase() || '720P';
+                      return (
+                        <button
+                          key={model.id}
+                          onClick={() => { setSelectedModel(model); setModelSearch(''); setModelPickerOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer ${
+                            isSelected ? 'bg-white/8' : 'hover:bg-white/5'
+                          }`}
+                        >
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                            isSelected ? 'bg-primary/20 text-primary-hover' : 'bg-white/6 text-white/40'
+                          }`}>
+                            <Sparkles className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-white/75'}`}>
+                                {model.name}
+                              </span>
+                              {model.badge && (
+                                <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-primary/20 text-primary-hover border border-primary/20 leading-none">
+                                  {model.badge}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {model.model_type === 'image' ? (
+                                <span className="text-[9px] text-white/35 font-bold">₹{model.base_cost} flat</span>
+                              ) : (
+                                <>
+                                  <span className="text-[9px] text-white/35 font-bold">{topRes}</span>
+                                  <span className="text-white/15 text-[9px]">·</span>
+                                  <span className="text-[9px] text-white/35 font-bold">4s–{model.max_duration}s</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-primary-hover shrink-0" />}
+                        </button>
+                      );
+                    })
+                  }
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* OUTPUT SETTINGS */}
           <div className="space-y-4 pt-2 border-t border-white/5">
             <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Output settings</label>
             
-            {/* Resolution dropdown */}
-            <Select
-              label="Resolution"
-              value={resolution}
-              onChange={(e) => setResolution(e.target.value)}
-              options={
-                selectedModel?.supported_resolutions?.map((r) => ({ value: r, label: r.toUpperCase() })) || [
-                  { value: '720p', label: '720P' }
-                ]
-              }
-            />
+            {/* Resolution dropdown (video only) */}
+            {activeMode === 'video' && (
+              <Select
+                label="Resolution"
+                value={resolution}
+                onChange={(e) => setResolution(e.target.value)}
+                options={
+                  selectedModel?.supported_resolutions?.map((r) => ({ value: r, label: r.toUpperCase() })) || [
+                    { value: '720p', label: '720P' }
+                  ]
+                }
+              />
+            )}
 
-            {/* Aspect dropdown */}
+            {/* Aspect dropdown (video + image) */}
             <Select
               label="Aspect Ratio"
               value={aspectRatio}
@@ -340,38 +536,42 @@ export default function Studio() {
               }
             />
 
-            {/* Duration Slider */}
-            <div className="flex flex-col space-y-1.5">
-              <div className="flex justify-between text-[10px] font-bold text-white/50 tracking-wider">
-                <span>Duration</span>
-                <span className="text-primary-hover font-black">{duration}s</span>
-              </div>
-              <input
-                type="range"
-                min="4"
-                max={selectedModel?.max_duration || 15}
-                value={duration}
-                onChange={(e) => setDuration(parseInt(e.target.value))}
-                className="w-full accent-primary h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer"
-              />
-            </div>
-
-            {/* Audio Toggle button */}
-            {selectedModel?.supports_audio && (
-              <div className="flex items-center justify-between bg-surface-elevated px-3 py-2 rounded-xl border border-white/5">
-                <div className="flex items-center space-x-2 text-xs font-semibold text-white/60">
-                  {audioOn ? <Volume2 className="w-4 h-4 text-primary-hover" /> : <VolumeX className="w-4 h-4 text-white/30" />}
-                  <span>Generate Audio</span>
+            {/* Discrete Duration Selector (video only) */}
+            {activeMode === 'video' && (
+              <div className="flex flex-col space-y-1.5">
+                <div className="flex justify-between text-[10px] font-bold text-white/50 tracking-wider">
+                  <span>Duration</span>
+                  <span className="text-primary-hover font-black">{duration}s</span>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={audioOn}
-                  onChange={(e) => setAudioOn(e.target.checked)}
-                  className="w-4 h-4 accent-primary rounded bg-surface border-white/10"
-                />
+                <div className="grid grid-cols-4 gap-1.5 bg-white/5 p-1 rounded-xl border border-white/8">
+                  {[4, 6, 8, 10].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      disabled={selectedModel?.max_duration && sec > selectedModel.max_duration}
+                      onClick={() => setDuration(sec)}
+                      className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        duration === sec
+                          ? 'bg-primary text-white shadow-xs'
+                          : 'text-white/60 hover:text-white hover:bg-white/5'
+                      } ${selectedModel?.max_duration && sec > selectedModel.max_duration ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    >
+                      {sec}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Audio indicator (video only) */}
+            {activeMode === 'video' && selectedModel?.supports_audio && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/8 border border-primary/15">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse" />
+                <span className="text-[9px] font-bold text-primary/70 uppercase tracking-wider">Audio generation included</span>
               </div>
             )}
           </div>
+
         </div>
 
         {/* Dynamic Cost Estimator */}
@@ -413,11 +613,18 @@ export default function Studio() {
             <Button
               variant="primary"
               size="md"
-              disabled={!promptText.trim() || insufficientCredits || generationStatus !== 'idle'}
+              disabled={
+                !promptText.trim() ||
+                insufficientCredits ||
+                (activeMode === 'image' ? imageGenerating : generationStatus !== 'idle')
+              }
               onClick={handleGenerate}
               className="shadow-premium uppercase font-extrabold text-xs tracking-wider"
             >
-              Generate Video
+              {activeMode === 'image'
+                ? (imageGenerating ? 'Generating Image...' : 'Generate Image')
+                : (generationStatus !== 'idle' ? 'Generating Video...' : 'Generate Video')
+              }
             </Button>
           }
         />
@@ -430,67 +637,109 @@ export default function Studio() {
             {activeCanvasTab === 'editor' && (
               <div className="w-full max-w-xl aspect-video glass-premium rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden relative shadow-premium">
                 
-                {generationStatus === 'pending' || generationStatus === 'processing' ? (
-                  /* Processing compilation frame */
-                  <div className="flex flex-col items-center justify-center p-6 w-full h-full text-center space-y-4">
-                    <RefreshCw className="w-8 h-8 text-primary-hover animate-spin" />
-                    <div>
-                      <h4 className="text-sm font-bold text-white tracking-wide">Compiling Cinematic Frames</h4>
-                      <p className="text-[10.5px] text-white/45 mt-1 font-semibold uppercase tracking-wider">
-                        Running {selectedModel?.name} pipeline in background...
+                {/* IMAGE MODE CANVAS */}
+                {activeMode === 'image' ? (
+                  imageGenerating ? (
+                    <div className="flex flex-col items-center justify-center p-6 w-full h-full text-center space-y-4">
+                      <RefreshCw className="w-8 h-8 text-primary-hover animate-spin" />
+                      <div>
+                        <h4 className="text-sm font-bold text-white tracking-wide">Generating High-Detail Image</h4>
+                        <p className="text-[10.5px] text-white/45 mt-1 font-semibold uppercase tracking-wider">
+                          Running {selectedModel?.name} on Replicate GPU...
+                        </p>
+                      </div>
+                    </div>
+                  ) : activeImageUrl ? (
+                    <div className="relative w-full h-full group flex items-center justify-center bg-black">
+                      <img
+                        src={activeImageUrl}
+                        alt="Generated result"
+                        className="w-full h-full object-contain"
+                      />
+                      <a
+                        href={activeImageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black/90 backdrop-blur-sm border border-white/15 rounded-lg text-xs font-bold text-white transition-colors"
+                      >
+                        Download Image
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center p-8 space-y-3">
+                      <div className="p-4 bg-primary/10 border border-primary/20 rounded-full text-primary-hover animate-pulse">
+                        <Sparkles className="w-8 h-8" />
+                      </div>
+                      <h4 className="text-sm font-bold text-white tracking-wide">Image preview canvas</h4>
+                      <p className="text-xs text-white/50 max-w-xs leading-relaxed font-semibold">
+                        Describe your vision below and select an image model ({selectedModel?.name || 'Nano Banana'}) to create artwork.
                       </p>
                     </div>
-                    <div className="w-64">
-                      <ProgressBar value={generationProgress} showGlow />
-                    </div>
-                  </div>
-                ) : generationStatus === 'failed' ? (
-                  /* Generation Failure frame */
-                  <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
-                    <X className="w-10 h-10 text-error p-2 bg-error/15 rounded-full border border-error/25 animate-bounce" />
-                    <h4 className="text-sm font-extrabold text-error">AI Synthesis Disrupted</h4>
-                    <p className="text-xs text-white/50 max-w-sm leading-relaxed">{generationError}</p>
-                    <Button variant="secondary" size="sm" onClick={() => setGenerationStatus('idle')}>
-                      Try Again
-                    </Button>
-                  </div>
-                ) : activeVideo ? (
-                  /* Active video playing VLC Frame */
-                  <div className="relative w-full h-full group">
-                    <video
-                      src={activeVideo.video_url}
-                      controls
-                      autoPlay
-                      playsInline
-                      loop
-                      className="w-full h-full object-cover"
-                    />
-
-                    {/* Dynamic Premium Watermark Overlay for free accounts */}
-                    {watermarkRequired && (
-                      <>
-                        <div className="absolute top-3.5 left-3.5 bg-black/60 backdrop-blur-xs px-2.5 py-1 rounded-md border border-white/10 text-[10px] font-black uppercase text-primary pointer-events-none select-none tracking-widest z-20 animate-pulse">
-                          BrandVox AI Free
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-10 overflow-hidden">
-                          <span className="text-white/10 text-4xl font-black uppercase tracking-widest -rotate-25 whitespace-nowrap">
-                            BrandVox AI
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  )
                 ) : (
-                  /* Default Empty Canvas state */
-                  <div className="flex flex-col items-center justify-center text-center p-8 space-y-3">
-                    <div className="p-4 bg-primary/10 border border-primary/20 rounded-full text-primary-hover animate-pulse">
-                      <Film className="w-8 h-8" />
+                  /* VIDEO MODE CANVAS */
+                  generationStatus === 'pending' || generationStatus === 'processing' ? (
+                    /* Processing compilation frame */
+                    <div className="flex flex-col items-center justify-center p-6 w-full h-full text-center space-y-4">
+                      <RefreshCw className="w-8 h-8 text-primary-hover animate-spin" />
+                      <div>
+                        <h4 className="text-sm font-bold text-white tracking-wide">Compiling Cinematic Frames</h4>
+                        <p className="text-[10.5px] text-white/45 mt-1 font-semibold uppercase tracking-wider">
+                          Running {selectedModel?.name} pipeline in background...
+                        </p>
+                      </div>
+                      <div className="w-64">
+                        <ProgressBar value={generationProgress} showGlow />
+                      </div>
                     </div>
-                    <h4 className="text-sm font-bold text-white tracking-wide">Video preview canvas</h4>
-                    <p className="text-xs text-white/50 max-w-xs leading-relaxed font-semibold">
-                      Describe your concept below and trigger generation to render your cinematic reel.
-                    </p>
-                  </div>
+                  ) : generationStatus === 'failed' ? (
+                    /* Generation Failure frame */
+                    <div className="flex flex-col items-center justify-center p-6 text-center space-y-3">
+                      <X className="w-10 h-10 text-error p-2 bg-error/15 rounded-full border border-error/25 animate-bounce" />
+                      <h4 className="text-sm font-extrabold text-error">AI Synthesis Disrupted</h4>
+                      <p className="text-xs text-white/50 max-w-sm leading-relaxed">{generationError}</p>
+                      <Button variant="secondary" size="sm" onClick={() => setGenerationStatus('idle')}>
+                        Try Again
+                      </Button>
+                    </div>
+                  ) : activeVideo ? (
+                    /* Active video playing VLC Frame */
+                    <div className="relative w-full h-full group">
+                      <video
+                        src={activeVideo.video_url}
+                        controls
+                        autoPlay
+                        playsInline
+                        loop
+                        className="w-full h-full object-cover"
+                      />
+
+                      {/* Dynamic Premium Watermark Overlay for free accounts */}
+                      {watermarkRequired && (
+                        <>
+                          <div className="absolute top-3.5 left-3.5 bg-black/60 backdrop-blur-xs px-2.5 py-1 rounded-md border border-white/10 text-[10px] font-black uppercase text-primary pointer-events-none select-none tracking-widest z-20 animate-pulse">
+                            BrandVox AI Free
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-10 overflow-hidden">
+                            <span className="text-white/10 text-4xl font-black uppercase tracking-widest -rotate-25 whitespace-nowrap">
+                              BrandVox AI
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    /* Default Empty Canvas state */
+                    <div className="flex flex-col items-center justify-center text-center p-8 space-y-3">
+                      <div className="p-4 bg-primary/10 border border-primary/20 rounded-full text-primary-hover animate-pulse">
+                        <Film className="w-8 h-8" />
+                      </div>
+                      <h4 className="text-sm font-bold text-white tracking-wide">Video preview canvas</h4>
+                      <p className="text-xs text-white/50 max-w-xs leading-relaxed font-semibold">
+                        Describe your concept below and trigger generation to render your cinematic reel.
+                      </p>
+                    </div>
+                  )
                 )}
               </div>
             )}

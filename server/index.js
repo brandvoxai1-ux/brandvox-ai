@@ -8,6 +8,7 @@ const authRouter = require('./routes/auth');
 const generateRouter = require('./routes/generate');
 const creditsRouter = require('./routes/credits');
 const adminRouter = require('./routes/admin');
+const uploadRouter = require('./routes/upload');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,7 +20,15 @@ app.use(helmet({
 
 // Configure Cross-Origin Resource Sharing
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (!process.env.CLIENT_URL) return callback(null, true);
+    const clientClean = process.env.CLIENT_URL.replace(/\/$/, '');
+    if (origin === clientClean || origin.includes('localhost') || origin.endsWith('.netlify.app')) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   credentials: true
 }));
 
@@ -34,6 +43,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/generate', generateRouter);
 app.use('/api/credits', creditsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/upload', uploadRouter);
 
 // Models list endpoint (proxies to database using service credentials to avoid direct RLS/CORS issues)
 app.get('/api/models', async (req, res) => {
@@ -59,10 +69,8 @@ app.get('/api/health', (req, res) => {
     status: 'online',
     platform: 'BrandVox AI',
     timestamp: new Date().toISOString(),
-    upiConfigured: !!process.env.UPI_ID,
-    falConfigured: !!process.env.FAL_KEY,
-    sbUrlLength: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.length : 0,
-    sbKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.length : 0
+    ready: !!((process.env.REPLICATE_API_TOKEN || process.env.FAL_KEY) && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+    ai_backend: process.env.REPLICATE_API_TOKEN ? 'replicate' : 'fal.ai'
   });
 });
 

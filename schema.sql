@@ -222,3 +222,182 @@ grant all privileges on all functions in schema public to postgres, anon, authen
 alter default privileges in schema public grant all on tables to postgres, anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to postgres, anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to postgres, anon, authenticated, service_role;
+
+-- =========================================================================
+-- BrandVox AI Security Hardening and Atomic Actions updates
+-- =========================================================================
+
+-- Trigger Function to prevent standard users from updating restricted columns in public.profiles
+create or replace function public.check_profile_updates()
+returns trigger as $$
+begin
+  -- Regular authenticated users can only update full_name and avatar_url
+  if auth.role() = 'authenticated' then
+    if old.role is distinct from new.role or 
+       old.credits is distinct from new.credits or 
+       old.is_banned is distinct from new.is_banned or 
+       old.id is distinct from new.id or 
+       old.email is distinct from new.email or
+       old.total_spent is distinct from new.total_spent or
+       old.total_videos is distinct from new.total_videos or
+       old.created_at is distinct from new.created_at then
+      raise exception 'Unauthorized modification of restricted profile fields.';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+-- Recreate trigger if exists
+drop trigger if exists tr_check_profile_updates on public.profiles;
+create trigger tr_check_profile_updates
+  before update on public.profiles
+  for each row execute procedure public.check_profile_updates();
+
+
+-- Atomic User Credit Deduction function
+create or replace function public.deduct_user_credits(
+  p_user_id uuid,
+  p_amount numeric,
+  p_description text,
+  p_generation_id uuid
+)
+returns boolean as $$
+declare
+  v_current_credits numeric;
+begin
+  -- Row locking
+  select credits into v_current_credits
+  from public.profiles
+  where id = p_user_id
+  for update;
+
+  if v_current_credits >= p_amount then
+    -- Deduct user credits
+    update public.profiles
+    set 
+      credits = credits - p_amount,
+      total_spent = total_spent + p_amount,
+      total_videos = total_videos + 1,
+      updated_at = now()
+    where id = p_user_id;
+
+    -- Log transaction
+    insert into public.transactions (user_id, type, amount, description, generation_id)
+    values (p_user_id, 'usage', -p_amount, p_description, p_generation_id);
+
+    return true;
+  else
+    return false;
+  end if;
+end;
+$$ language plpgsql security definer;
+
+
+-- Atomic User Credit Addition function
+create or replace function public.add_user_credits(
+  p_user_id uuid,
+  p_amount numeric,
+  p_description text,
+  p_gateway_payment_id text,
+  p_gateway_order_id text,
+  p_gateway_name text
+)
+returns void as $$
+begin
+  -- Credit user balance
+  update public.profiles
+  set 
+    credits = credits + p_amount,
+    updated_at = now()
+  where id = p_user_id;
+
+  -- Log transaction
+  insert into public.transactions (user_id, type, amount, description, gateway_payment_id, gateway_order_id, gateway_name)
+  values (p_user_id, 'purchase', p_amount, p_description, p_gateway_payment_id, p_gateway_order_id, p_gateway_name);
+end;
+$$ language plpgsql security definer;
+
+
+-- Atomic Admin Credit Adjustment function
+create or replace function public.admin_adjust_user_credits(
+  p_user_id uuid,
+  p_amount numeric,
+  p_action text,
+  p_reason text
+)
+returns boolean as $$
+declare
+  v_current_credits numeric;
+begin
+  -- Row locking
+  select credits into v_current_credits
+  from public.profiles
+  where id = p_user_id
+  for update;
+
+  if p_action = 'grant' then
+    update public.profiles
+    set credits = credits + p_amount
+    where id = p_user_id;
+
+    insert into public.transactions (user_id, type, amount, description)
+    values (p_user_id, 'admin_grant', p_amount, p_reason);
+    return true;
+  elsif p_action = 'deduct' then
+    if v_current_credits >= p_amount then
+      update public.profiles
+      set credits = credits - p_amount
+      where id = p_user_id;
+
+      insert into public.transactions (user_id, type, amount, description)
+      values (p_user_id, 'usage', -p_amount, p_reason);
+      return true;
+    else
+      return false;
+    end if;
+  else
+    return false;
+  end if;
+end;
+$$ language plpgsql security definer;
+
+
+-- Configure Storage bucket and security policies if storage schema exists
+insert into storage.buckets (id, name, public)
+values ('videos', 'videos', true)
+on conflict (id) do nothing;
+
+-- Storage policies for the public videos bucket
+drop policy if exists "Public Access to Videos" on storage.objects;
+create policy "Public Access to Videos" on storage.objects 
+  for select using (bucket_id = 'videos');
+
+drop policy if exists "Admins/Service can upload" on storage.objects;
+create policy "Admins/Service can upload" on storage.objects 
+  for all using (bucket_id = 'videos');
+
+
+-- =========================================================================
+-- Uploads bucket for user image uploads (Image-to-Video source images)
+-- =========================================================================
+insert into storage.buckets (id, name, public)
+values ('uploads', 'uploads', true)
+on conflict (id) do nothing;
+
+-- Allow authenticated users to upload to the 'uploads' bucket
+drop policy if exists "Authenticated users can upload images" on storage.objects;
+create policy "Authenticated users can upload images" on storage.objects
+  for insert with check (bucket_id = 'uploads' AND auth.role() = 'authenticated');
+
+-- Allow public read access to uploaded images
+drop policy if exists "Public Access to Uploads" on storage.objects;
+create policy "Public Access to Uploads" on storage.objects
+  for select using (bucket_id = 'uploads');
+
+-- Allow users to delete their own uploads
+drop policy if exists "Users can delete own uploads" on storage.objects;
+create policy "Users can delete own uploads" on storage.objects
+  for delete using (bucket_id = 'uploads' AND auth.role() = 'authenticated');
+
+

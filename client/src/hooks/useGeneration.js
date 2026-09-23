@@ -35,6 +35,19 @@ export function useGeneration() {
     }
   };
 
+  const createImageGeneration = async (payload) => {
+    setError(null);
+    try {
+      const res = await api.post('/generate/image', payload);
+      return res.data; // { success, generationId, image_url, cost }
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to generate image.';
+      setError(errorMsg);
+      throw new Error(errorMsg);
+    }
+  };
+
+
   const getStatus = async (id) => {
     try {
       const res = await api.get(`/generate/${id}/status`);
@@ -70,6 +83,7 @@ export function useGeneration() {
     error,
     fetchGenerations,
     createGeneration,
+    createImageGeneration,
     getStatus,
     updateGeneration,
     deleteGeneration

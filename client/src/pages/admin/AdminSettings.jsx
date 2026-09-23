@@ -10,6 +10,7 @@ export default function AdminSettings() {
   const [platformName, setPlatformName] = useState('BrandVox AI');
   const [welcomeCredits, setWelcomeCredits] = useState(50.00);
   const [maxFreeGens, setMaxFreeGens] = useState(5);
+  const [targetProfitMargin, setTargetProfitMargin] = useState(60);
   
   // Toggles
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -27,6 +28,7 @@ export default function AdminSettings() {
       setPlatformName(s.platformName || 'BrandVox AI');
       setWelcomeCredits(parseFloat(s.welcomeCredits || 50));
       setMaxFreeGens(parseInt(s.maxFreeGenerationsPerDay || 5));
+      setTargetProfitMargin(parseFloat(s.targetProfitMargin || 60));
       setMaintenanceMode(!!s.maintenanceMode);
       setAllowSignups(!!s.allowSignups);
     } catch (err) {
@@ -48,6 +50,7 @@ export default function AdminSettings() {
         platformName,
         welcomeCredits: parseFloat(welcomeCredits),
         maxFreeGenerationsPerDay: parseInt(maxFreeGens),
+        targetProfitMargin: parseFloat(targetProfitMargin),
         maintenanceMode,
         allowSignups
       };
@@ -76,7 +79,7 @@ export default function AdminSettings() {
         <div>
           <h1 className="text-xl font-black text-white uppercase tracking-wider">Platform Specifications</h1>
           <p className="text-[10.5px] text-purple-300 font-bold uppercase tracking-widest mt-1">
-            Global onboarding bonuses, signups configurations, and maintenance banners
+            Global onboarding bonuses, profit margin targets, and maintenance banners
           </p>
         </div>
       </div>
@@ -105,13 +108,28 @@ export default function AdminSettings() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Input
-            label="Max Free compiles / Day"
+            label="Max Free Gens / Day"
             type="number"
             value={maxFreeGens}
-            onChange={(e) => setMaxFreeGens(parseInt(e.target.value))}
+            onChange={(e) => setMaxFreeGens(e.target.value)}
             required
           />
+          <div className="space-y-1.5">
+            <Input
+              label="Target Profit Margin (%)"
+              type="number"
+              min="10"
+              max="95"
+              value={targetProfitMargin}
+              onChange={(e) => setTargetProfitMargin(e.target.value)}
+              required
+            />
+            <p className="text-[9.5px] text-purple-300/50 font-semibold">
+              Client target profit markup over Replicate costs (e.g. 60% = ~2.5x markup)
+            </p>
+          </div>
         </div>
+
 
         {/* Dynamic toggles */}
         <div className="space-y-4 pt-2 border-t border-purple-500/5 select-none">
@@ -153,7 +171,7 @@ export default function AdminSettings() {
           <label className="text-[10px] font-bold text-purple-300/40 uppercase tracking-widest block">API Channels Check</label>
           <div className="grid grid-cols-2 gap-4 text-[10.5px]">
             <div className="bg-[#130E26] px-3.5 py-2.5 rounded-lg flex items-center justify-between border border-purple-500/5">
-              <span className="font-semibold text-white/60">fal.ai Integration</span>
+              <span className="font-semibold text-white/60">Replicate AI Integration</span>
               <div className="flex items-center space-x-1 text-success">
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span className="font-extrabold uppercase text-[9px] tracking-wider">Ready</span>

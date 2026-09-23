@@ -1,20 +1,10 @@
+# Netlify Configuration for BrandVox AI Frontend
 [build]
-  # Build backend dependencies, then build the frontend
-  command = "yarn install && cd server && yarn install && cd ../client && yarn install && yarn build"
-  publish = "client/dist"
-  functions = "netlify/functions"
-
-[build.environment]
-  NODE_VERSION = "20"
+  base = "client"
+  publish = "dist"
+  command = "yarn build"
 
 [[redirects]]
-  # Send API requests to the Netlify Serverless Function
-  from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
-  status = 200
-
-[[redirects]]
-  # Serve React SPA router for all other requests
   from = "/*"
   to = "/index.html"
   status = 200

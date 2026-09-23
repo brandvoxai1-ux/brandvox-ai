@@ -210,55 +210,33 @@ router.patch('/users/:id/credits', async (req, res) => {
   const logReason = reason || `Admin manual adjustment (${action})`;
 
   try {
-    const { data: user, error: fetchErr } = await supabase
+    const { data: success, error: rpcErr } = await supabase.rpc('admin_adjust_user_credits', {
+      p_user_id: targetUserId,
+      p_amount: creditVal,
+      p_action: action,
+      p_reason: logReason
+    });
+
+    if (rpcErr) throw rpcErr;
+
+    if (!success) {
+      return res.status(400).json({ error: 'Adjustment failed. User balance would fall below zero.' });
+    }
+
+    // Fetch the updated balance to return it
+    const { data: profile } = await supabase
       .from('profiles')
       .select('credits')
       .eq('id', targetUserId)
       .single();
 
-    if (fetchErr || !user) {
-      return res.status(404).json({ error: 'Target user not found.' });
-    }
+    const updatedCredits = parseFloat(profile?.credits || 0);
 
-    const currentCredits = parseFloat(user.credits || 0);
-    let updatedCredits = currentCredits;
-
+    // Send notifications in background
     if (action === 'grant') {
-      updatedCredits += creditVal;
-      
-      // Update DB
-      await supabase.from('profiles').update({ credits: updatedCredits }).eq('id', targetUserId);
-
-      // Log transaction
-      await supabase.from('transactions').insert({
-        user_id: targetUserId,
-        type: 'admin_grant',
-        amount: creditVal,
-        description: logReason
-      });
-
       await createNotification(targetUserId, 'Credits Granted 🎁', `An administrator manually added ₹${creditVal.toFixed(2)} to your credit balance.`, 'success');
-
     } else if (action === 'deduct') {
-      if (currentCredits < creditVal) {
-        return res.status(400).json({ error: 'Cannot deduct credits. User balance would fall below zero.' });
-      }
-      updatedCredits -= creditVal;
-
-      // Update DB
-      await supabase.from('profiles').update({ credits: updatedCredits }).eq('id', targetUserId);
-
-      // Log transaction
-      await supabase.from('transactions').insert({
-        user_id: targetUserId,
-        type: 'usage',
-        amount: -creditVal,
-        description: logReason
-      });
-
       await createNotification(targetUserId, 'Credits Adjusted 💸', `An administrator manually deducted ₹${creditVal.toFixed(2)} from your credits.`, 'warning');
-    } else {
-      return res.status(400).json({ error: 'Invalid operation action.' });
     }
 
     res.json({ success: true, updatedCredits });
@@ -403,32 +381,21 @@ router.post('/generations/:id/refund', async (req, res) => {
 
     const refundAmount = parseFloat(gen.cost || 0);
 
-    // Fetch user credits
-    const { data: profile, error: profErr } = await supabase
-      .from('profiles')
-      .select('credits')
-      .eq('id', gen.user_id)
-      .single();
-
-    if (profErr || !profile) {
-      return res.status(404).json({ error: 'User associated with this generation was not found.' });
-    }
-
-    // Refund credits
-    const updatedCredits = parseFloat(profile.credits || 0) + refundAmount;
-    await supabase.from('profiles').update({ credits: updatedCredits }).eq('id', gen.user_id);
-
-    // Update generation state to refunded (or keep failed and flag)
-    await supabase.from('generations').update({ status: 'failed', error_message: 'Admin manually refunded.' }).eq('id', gen.id);
-
-    // Log transaction
-    await supabase.from('transactions').insert({
-      user_id: gen.user_id,
-      type: 'refund',
-      amount: refundAmount,
-      description: `Manual admin refund for generation ${gen.id}`,
-      generation_id: gen.id
+    // Refund credits atomically
+    await supabase.rpc('add_user_credits', {
+      p_user_id: gen.user_id,
+      p_amount: refundAmount,
+      p_description: `Manual admin refund for generation ${gen.id}`,
+      p_gateway_payment_id: `admin-refund-${gen.id}`,
+      p_gateway_order_id: `admin-refund-${gen.id}`,
+      p_gateway_name: 'admin'
     });
+
+    // Update generation state to failed (refunded)
+    await supabase
+      .from('generations')
+      .update({ status: 'failed', error_message: 'Admin manually refunded.' })
+      .eq('id', gen.id);
 
     await createNotification(gen.user_id, 'Credits Refunded 💰', `₹${refundAmount.toFixed(2)} refunded for video generation "${gen.title || 'Untitled'}" by admin.`, 'success');
 
@@ -593,17 +560,12 @@ router.post('/credits/grant', async (req, res) => {
 
     // 2. Perform updates and record transactions
     const bulkPromises = users.map(async (user) => {
-      const updatedCredits = parseFloat(user.credits || 0) + grantVal;
-      
-      // Update credits
-      await supabase.from('profiles').update({ credits: updatedCredits }).eq('id', user.id);
-      
-      // Log transaction
-      await supabase.from('transactions').insert({
-        user_id: user.id,
-        type: 'admin_grant',
-        amount: grantVal,
-        description: logReason
+      // Adjust credits atomically using RPC
+      await supabase.rpc('admin_adjust_user_credits', {
+        p_user_id: user.id,
+        p_amount: grantVal,
+        p_action: 'grant',
+        p_reason: logReason
       });
 
       // Send alert

@@ -22,34 +22,36 @@ import { Badge } from '../components/ui/Badge';
 export default function Landing() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeModal, setActiveModal] = useState(null); // 'about' | 'support' | 'privacy' | 'terms' | null
 
   const features = [
-    { icon: Film, title: 'Multi-Model Studio', desc: 'Switch between WAN 2.2, Seedance Fast, and Seedance Quality in one click.' },
-    { icon: Zap, title: 'Fast Generation', desc: 'High-speed render pipelines ensure your videos are ready in under 2 minutes.' },
-    { icon: Lock, title: 'Private by Default', desc: 'Your generated videos are completely private. We never train models on your assets.' },
+    { icon: Film, title: 'Multi-Model Studio', desc: 'Seamlessly switch between MiniMax Hailuo, Kling Video, Wan 2.5, and Ideogram.' },
+    { icon: Zap, title: 'Fast Generation', desc: 'High-speed render pipelines ensure your videos and images are ready in minutes.' },
+    { icon: Lock, title: 'Private by Default', desc: 'Your generated creations are completely private. We never train models on your assets.' },
     { icon: Music, title: 'Native Audio Support', desc: 'Create cinematic AI-generated videos accompanied by synchronized audio tracks.' },
-    { icon: Coins, title: 'Pay As You Go (INR)', desc: 'Buy credit packages as needed. No recurring subscriptions or lock-ins.' },
+    { icon: Coins, title: 'Pay As You Go (INR)', desc: 'Buy credit packages with instant UPI QR. No recurring subscriptions or lock-ins.' },
     { icon: BarChart, title: 'Usage Metrics', desc: 'Track generation times, aspect adjustments, and costs in real time.' }
   ];
 
   const modelsList = [
-    { name: 'WAN 2.2', price: '1 🪙', provider: 'Alibaba', badge: 'Budget Option', desc: 'Open source, high resolution, and extremely affordable.' },
-    { name: 'Seedance Fast', price: '3 🪙', provider: 'ByteDance', badge: 'Fastest Render', desc: 'Blazing fast generations with native audio capability.' },
-    { name: 'Seedance Quality', price: '5 🪙', provider: 'ByteDance', badge: 'Premium Quality', desc: 'Cinematic video generations with pristine realism.' }
+    { name: 'MiniMax Hailuo', price: '3.5 🪙/s', provider: 'MiniMax', badge: 'Most Popular', desc: 'Cinematic video generation with pristine temporal physics and realism.' },
+    { name: 'Kling Video', price: '4.5 🪙/s', provider: 'Kuaishou', badge: 'Director Grade', desc: 'Ultra-smooth motion coherence and high-fidelity rendering.' },
+    { name: 'Wan 2.5 Fast', price: '1.5 🪙/s', provider: 'Wan Video', badge: 'High Speed', desc: 'Quick turnaround video diffusion with rich detail.' },
+    { name: 'P-Image Ideogram', price: '10 🪙/img', provider: 'Ideogram', badge: 'Image Studio', desc: 'State-of-the-art text rendering and typography image generation.' }
   ];
 
   // Approved INR Packages
   const pricingPacks = [
-    { id: 'starter', name: 'Starter Pack', price: '₹99', credits: '99.00 🪙', bonus: null, desc: 'Perfect for beginners starting to explore.', features: ['99.00 🪙 Balance', 'WAN & Seedance Access', 'Watermarked Outputs'] },
-    { id: 'creator', name: 'Creator Pack', price: '₹249', credits: '274.00 🪙', bonus: '10% Bonus', desc: 'Most popular option for designers.', features: ['274.00 🪙 Balance', 'Google OAuth Signup', 'Watermarked Outputs', 'Priority Generations Queue'] },
+    { id: 'starter', name: 'Starter Pack', price: '₹99', credits: '99.00 🪙', bonus: null, desc: 'Perfect for beginners starting to explore.', features: ['99.00 🪙 Balance', 'Full Video & Image Access', 'Standard Generations Queue'] },
+    { id: 'creator', name: 'Creator Pack', price: '₹249', credits: '274.00 🪙', bonus: '10% Bonus', desc: 'Most popular option for designers.', features: ['274.00 🪙 Balance', 'Watermark-Free Downloads', 'Priority Generations Queue'] },
     { id: 'pro', name: 'Pro Pack', price: '₹499', credits: '574.00 🪙', bonus: '15% Bonus', desc: 'Unlock premium high-resolution options.', features: ['574.00 🪙 Balance', 'All features included', '24/7 Priority Support'] },
     { id: 'studio', name: 'Studio Pack', price: '₹999', credits: '1,199.00 🪙', bonus: '20% Bonus', desc: 'Ultimate package for agency work.', features: ['1,199.00 🪙 Balance', 'Pristine 1080p outputs', 'Custom aspect integrations', 'Immediate priority execution'] }
   ];
 
   const testimonials = [
-    { initials: 'AK', name: 'Aarav Kumar', role: 'Motion Lead', text: 'BrandVox AI has completely transformed how our design team drafts pitches. Switching between WAN and Seedance takes seconds!' },
-    { initials: 'NP', name: 'Neha Patel', role: 'Agency Director', text: 'Pricing in INR without monthly lock-ins is a total game-changer. UPI checkouts with Cashfree are incredibly smooth.' },
-    { initials: 'RS', name: 'Rohan Sharma', role: 'Content Creator', text: 'The cinematic output on Seedance Quality is jaw-dropping. Highly recommend the Studio package!' }
+    { initials: 'AK', name: 'Aarav Kumar', role: 'Motion Lead', text: 'BrandVox AI has completely transformed how our design team drafts pitches. Switching between Hailuo and Kling takes seconds!' },
+    { initials: 'NP', name: 'Neha Patel', role: 'Agency Director', text: 'Pricing in INR without monthly lock-ins is a total game-changer. Instant UPI top-ups make credit reloads seamless.' },
+    { initials: 'RS', name: 'Rohan Sharma', role: 'Content Creator', text: 'The cinematic output on MiniMax Hailuo is jaw-dropping. Highly recommend the Creator and Pro packages!' }
   ];
 
   return (
@@ -206,7 +208,7 @@ export default function Landing() {
             </div>
             <h3 className="text-sm font-bold text-white">Choose Model</h3>
             <p className="text-xs text-white/50 font-medium leading-relaxed max-w-xs">
-              Select between alibaba's budget WAN 2.2 or bytedance's Seedance Fast/Quality engines.
+              Select between cinematic MiniMax Hailuo, Kling Video, fast Wan 2.5, or Ideogram image models.
             </p>
           </div>
 
@@ -227,14 +229,14 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center max-w-xl mx-auto mb-16">
             <h2 className="text-2xl md:text-3xl font-extrabold tracking-wide">
-              AI Video Models Showcase
+              AI Models Showcase
             </h2>
             <p className="text-xs md:text-sm text-white/50 mt-3 leading-relaxed font-medium">
-              Flexible billing per second in INR. Select the model that matches your aesthetic and budget.
+              Flexible pay-as-you-go billing in INR. Select the model that matches your aesthetic and budget.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {modelsList.map((model, idx) => (
               <div key={idx} className="p-6 bg-surface border border-white/5 rounded-xl hover-scale flex flex-col justify-between space-y-6">
                 <div>
@@ -247,8 +249,8 @@ export default function Landing() {
                 </div>
 
                 <div className="flex items-center justify-between border-t border-white/5 pt-4 text-xs font-semibold">
-                  <span className="text-white/40 uppercase tracking-wider text-[10px]">Price per sec</span>
-                  <span className="text-white font-black tracking-wide text-sm">{model.price}/s</span>
+                  <span className="text-white/40 uppercase tracking-wider text-[10px]">Pricing</span>
+                  <span className="text-white font-black tracking-wide text-sm">{model.price}</span>
                 </div>
               </div>
             ))}
@@ -348,7 +350,7 @@ export default function Landing() {
               <span className="text-sm font-extrabold text-white tracking-wider">BrandVox AI</span>
             </div>
             <p className="text-[11px] leading-relaxed max-w-xs text-white/30 font-medium">
-              Pristine multi-model AI video workspace supporting high-resolution exports and Cashfree Payments INR integrations.
+              Pristine multi-model AI video and image studio with instant UPI QR & Indian Rupee (INR) pay-as-you-go billing.
             </p>
           </div>
 
@@ -365,16 +367,16 @@ export default function Landing() {
             <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4">Company</h4>
             <ul className="space-y-2.5">
               <li><span onClick={() => navigate('/explore')} className="hover:text-white transition-colors cursor-pointer">Explore Gallery</span></li>
-              <li><span className="hover:text-white transition-colors cursor-pointer">About BrandVox</span></li>
-              <li><span className="hover:text-white transition-colors cursor-pointer">Support Desk</span></li>
+              <li><span onClick={() => setActiveModal('about')} className="hover:text-white transition-colors cursor-pointer">About BrandVox</span></li>
+              <li><span onClick={() => setActiveModal('support')} className="hover:text-white transition-colors cursor-pointer">Support Desk</span></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4">Legal</h4>
             <ul className="space-y-2.5">
-              <li><span className="hover:text-white transition-colors cursor-pointer">Privacy Policy</span></li>
-              <li><span className="hover:text-white transition-colors cursor-pointer">Terms of Service</span></li>
+              <li><span onClick={() => setActiveModal('privacy')} className="hover:text-white transition-colors cursor-pointer">Privacy Policy</span></li>
+              <li><span onClick={() => setActiveModal('terms')} className="hover:text-white transition-colors cursor-pointer">Terms of Service</span></li>
             </ul>
           </div>
         </div>
@@ -384,6 +386,93 @@ export default function Landing() {
           <span className="mt-2 md:mt-0 text-white/20 font-medium">Billed in Indian Rupees (INR)</span>
         </div>
       </footer>
+
+      {/* 9. LEGAL & INFO MODAL DIALOG */}
+      {activeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-xl max-h-[85vh] bg-[#141414] border border-white/10 rounded-2xl p-6 md:p-8 overflow-y-auto shadow-2xl space-y-6">
+            <button
+              onClick={() => setActiveModal(null)}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {activeModal === 'privacy' && (
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-white">Privacy Policy</h3>
+                <p className="text-xs text-white/60 leading-relaxed">
+                  Last updated: September 2026. At BrandVox AI, your creative privacy is our highest priority.
+                </p>
+                <div className="space-y-3 text-xs text-white/70 leading-relaxed">
+                  <h4 className="text-sm font-semibold text-white">1. Data Ownership & Storage</h4>
+                  <p>All prompts, images, and videos generated via BrandVox AI belong exclusively to you. We do not use your private generations to train artificial intelligence models.</p>
+                  
+                  <h4 className="text-sm font-semibold text-white">2. Ephemeral Processing</h4>
+                  <p>Media inputs uploaded for Image-to-Video generation are stored in secure, private encrypted cloud storage and are accessible only by your authenticated profile.</p>
+
+                  <h4 className="text-sm font-semibold text-white">3. Payment Information</h4>
+                  <p>We do not store credit card or banking credentials. Payments are made through manual UPI transfers where transaction verification is done via 12-digit UTR reference numbers.</p>
+                </div>
+              </div>
+            )}
+
+            {activeModal === 'terms' && (
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-white">Terms of Service</h3>
+                <p className="text-xs text-white/60 leading-relaxed">
+                  By using BrandVox AI, you agree to adhere to our content and generation policies.
+                </p>
+                <div className="space-y-3 text-xs text-white/70 leading-relaxed">
+                  <h4 className="text-sm font-semibold text-white">1. Acceptable Use Policy</h4>
+                  <p>You agree not to generate illegal, defamatory, sexually explicit, abusive, or copyright-infringing content. Violations result in immediate account suspension without refund.</p>
+
+                  <h4 className="text-sm font-semibold text-white">2. Credits & Refunds</h4>
+                  <p>Credits purchased via UPI packages are added to your account upon verification. If an AI generation fails due to a server error, the exact credit cost is automatically refunded to your balance.</p>
+
+                  <h4 className="text-sm font-semibold text-white">3. Commercial Rights</h4>
+                  <p>You own full commercial exploitation rights to all videos and images synthesized by your account using paid credits.</p>
+                </div>
+              </div>
+            )}
+
+            {activeModal === 'about' && (
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-white">About BrandVox AI</h3>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  BrandVox AI is an Indian AI-native video and image generation platform designed to eliminate high recurring USD subscription barriers.
+                </p>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  By offering transparent INR pay-as-you-go billing with instant UPI checkouts, creators, marketers, and video agencies can synthesize cinematic reels, motion ads, and visual artwork using state-of-the-art diffusion engines like MiniMax Hailuo, Kling Video, Wan 2.5, and Ideogram.
+                </p>
+              </div>
+            )}
+
+            {activeModal === 'support' && (
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-white">Support Desk</h3>
+                <p className="text-xs text-white/70 leading-relaxed">
+                  Need assistance with your generations, UPI verification, or custom agency requirements?
+                </p>
+                <div className="p-4 bg-white/5 border border-white/8 rounded-xl space-y-2 text-xs">
+                  <p className="text-white/60">Email Support:</p>
+                  <p className="text-primary-hover font-bold text-sm">support@brandvox.ai</p>
+                  <p className="text-[11px] text-white/40 pt-1">Typical response time: Under 12 hours (Monday to Saturday).</p>
+                </div>
+                <p className="text-xs text-white/50 leading-relaxed">
+                  For payment verification queries, please keep your 12-digit bank UTR reference number and registered email address handy.
+                </p>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <Button variant="primary" size="sm" onClick={() => setActiveModal(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

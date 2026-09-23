@@ -13,6 +13,7 @@ import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Studio from './pages/Studio';
 import Projects from './pages/Projects';
+import Templates from './pages/Templates';
 import Explore from './pages/Explore';
 import Credits from './pages/Credits';
 import Settings from './pages/Settings';
@@ -86,6 +87,7 @@ export default function App() {
           {/* User Protected Views */}
           <Route path="/studio" element={<ProtectedRoute><Studio /></ProtectedRoute>} />
           <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+          <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
           <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
           <Route path="/credits" element={<ProtectedRoute><Credits /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

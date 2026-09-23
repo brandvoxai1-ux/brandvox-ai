@@ -1,9 +1,59 @@
 // client/src/components/shared/VideoCard.jsx
-import React, { useState } from 'react';
-import { Play, Download, Trash, Share2, Globe, Lock, AlertCircle, Info } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, Download, Trash, Share2, Globe, Lock, AlertCircle, Info, Crown } from 'lucide-react';
 import { formatDate, formatCredits } from '../../lib/utils';
 import { Badge } from '../ui/Badge';
+import api from '../../lib/api';
 import toast from 'react-hot-toast';
+
+const PLACEHOLDER_THUMB = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500';
+
+/**
+ * Extracts a single frame from a video URL using an off-screen canvas.
+ * Returns a data:image/jpeg;base64... string or null on failure.
+ */
+async function extractVideoThumbnail(videoUrl) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.preload = 'metadata';
+    video.src = videoUrl;
+
+    const timeout = setTimeout(() => {
+      video.src = '';
+      resolve(null);
+    }, 10000);
+
+    video.onloadedmetadata = () => {
+      // Seek to 1 second (or 10% of duration, whichever is smaller)
+      video.currentTime = Math.min(1, video.duration * 0.1);
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        clearTimeout(timeout);
+        video.src = '';
+        resolve(dataUrl);
+      } catch {
+        clearTimeout(timeout);
+        video.src = '';
+        resolve(null);
+      }
+    };
+
+    video.onerror = () => {
+      clearTimeout(timeout);
+      resolve(null);
+    };
+  });
+}
 
 export default function VideoCard({
   video,
@@ -11,31 +61,66 @@ export default function VideoCard({
   onPlay = null,
   onDelete = null,
   onToggleShare = null,
+  onRename = null,
   showActions = true
 }) {
   const [hovered, setHovered] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [thumbnail, setThumbnail] = useState(
+    // Use existing thumbnail if it's NOT the stale placeholder
+    video.thumbnail_url && video.thumbnail_url !== PLACEHOLDER_THUMB
+      ? video.thumbnail_url
+      : null
+  );
+  const thumbnailExtracted = useRef(false);
 
+  // Auto-extract thumbnail if the stored one is the Unsplash placeholder
+  useEffect(() => {
+    if (
+      video.status === 'completed' &&
+      video.video_url &&
+      !thumbnail &&
+      !thumbnailExtracted.current
+    ) {
+      thumbnailExtracted.current = true;
+      extractVideoThumbnail(video.video_url).then((dataUrl) => {
+        if (dataUrl) {
+          setThumbnail(dataUrl);
+          // Persist extracted thumbnail to DB silently (best-effort, no error shown to user)
+          api.patch(`/generate/${video.id}`, { thumbnail_url: dataUrl }).catch(() => {});
+        }
+      });
+    }
+  }, [video.status, video.video_url]);
+
+  // ─── Download (gated for free users) ───────────────────────────────────────
   const handleDownload = async (e) => {
     e.stopPropagation();
+
+    if (watermarkRequired) {
+      toast.error('⚠️ Download is only available for paid users. Purchase credits to unlock watermark-free downloads.', {
+        duration: 4000
+      });
+      return;
+    }
+
+    const toastId = toast.loading('Preparing download...');
     try {
-      toast.loading('Downloading video...');
       const response = await fetch(video.video_url);
+      if (!response.ok) throw new Error('Network error');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `brandvox-${video.title || 'video'}-${new Date(video.created_at).getTime()}.mp4`;
+      a.download = `brandvox-${(video.title || 'video').replace(/\s+/g, '-')}-${Date.now()}.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      toast.dismiss();
-      toast.success('Download complete!');
+      toast.success('Download complete!', { id: toastId });
     } catch (err) {
-      toast.dismiss();
-      toast.error('Failed to download video.');
+      toast.error('Failed to download video.', { id: toastId });
     }
   };
 
@@ -80,25 +165,38 @@ export default function VideoCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Video Player / Thumbnail Preview Panel */}
+      {/* ── Video Preview Panel ─────────────────────────────── */}
       <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
         {video.status === 'completed' ? (
           video.video_url ? (
             <div className="relative w-full h-full cursor-pointer" onClick={() => onPlay && onPlay(video)}>
-              {/* Actual Video Hover-Preview or static image */}
-              <video
-                src={video.video_url}
-                muted
-                playsInline
-                loop
-                className="w-full h-full object-cover"
-                onMouseOver={(e) => e.target.play()}
-                onMouseOut={(e) => {
-                  e.target.pause();
-                  e.target.currentTime = 0;
-                }}
-              />
-              
+
+              {/* Show extracted thumbnail as poster, hover plays the actual video */}
+              {hovered ? (
+                <video
+                  src={video.video_url}
+                  muted
+                  autoPlay
+                  playsInline
+                  loop
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                thumbnail ? (
+                  <img
+                    src={thumbnail}
+                    alt={video.title || 'Video thumbnail'}
+                    className="w-full h-full object-cover"
+                    onError={() => setThumbnail(null)}
+                  />
+                ) : (
+                  /* Thumbnail still extracting — show subtle loading state */
+                  <div className="w-full h-full bg-gradient-to-br from-surface-elevated to-black/60 flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+                  </div>
+                )
+              )}
+
               {/* Premium Watermark Overlay for Free Tier */}
               {watermarkRequired && (
                 <>
@@ -113,9 +211,9 @@ export default function VideoCard({
                 </>
               )}
 
-              {/* Hover actions block */}
+              {/* Hover play button */}
               {hovered && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 transition-opacity">
+                <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10 transition-opacity">
                   <button className="bg-primary hover:bg-primary-hover p-3 rounded-full text-white shadow-glow transform scale-110 active:scale-95 transition-all">
                     <Play className="w-5 h-5 fill-current" />
                   </button>
@@ -146,7 +244,7 @@ export default function VideoCard({
         )}
       </div>
 
-      {/* Title & Metadata Details Block */}
+      {/* ── Title & Metadata ─────────────────────────────────── */}
       <div className="p-4 flex flex-col justify-between flex-grow">
         <div>
           <div className="flex items-start justify-between">
@@ -172,18 +270,27 @@ export default function VideoCard({
           <span>Cost: {formatCredits(video.cost || 0)}</span>
         </div>
 
-        {/* Action button triggers */}
+        {/* ── Action Buttons ──────────────────────────────────── */}
         {showActions && video.status === 'completed' && (
           <div className="flex items-center justify-between border-t border-white/5 mt-3 pt-3">
             <div className="flex space-x-1.5">
+
+              {/* Download — locked behind paid tier */}
               <button
                 onClick={handleDownload}
-                className="p-1.5 rounded-lg text-white/55 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
-                title="Download MP4"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer group/dl relative ${
+                  watermarkRequired
+                    ? 'text-white/20 hover:text-warning hover:bg-warning/5'
+                    : 'text-white/55 hover:text-white hover:bg-white/5'
+                }`}
+                title={watermarkRequired ? 'Purchase credits to download watermark-free' : 'Download MP4'}
               >
-                <Download className="w-4 h-4" />
+                {watermarkRequired
+                  ? <Crown className="w-4 h-4" />
+                  : <Download className="w-4 h-4" />
+                }
               </button>
-              
+
               {onToggleShare && (
                 <button
                   onClick={handleShareClick}

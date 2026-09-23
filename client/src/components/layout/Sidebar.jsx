@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import {
   Film,
   FolderOpen,
+  LayoutTemplate,
   Compass,
   Coins,
   Bell,
@@ -65,6 +66,7 @@ export default function Sidebar({ toggleNotifications }) {
   const menuItems = [
     { id: 'studio', path: '/studio', label: 'Studio', icon: Film },
     { id: 'projects', path: '/projects', label: 'My Videos', icon: FolderOpen },
+    { id: 'templates', path: '/templates', label: 'Templates', icon: LayoutTemplate },
     { id: 'explore', path: '/explore', label: 'Explore', icon: Compass },
     { id: 'credits', path: '/credits', label: 'Credits', icon: Coins },
     { id: 'notifications', action: toggleNotifications, label: 'Alerts', icon: Bell, badge: unreadCount },

@@ -4,9 +4,10 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { generationLimiter } = require('../middleware/rateLimit');
 const supabase = require('../lib/supabase');
-const falService = require('../services/falService');
+const replicateService = require('../services/replicateService');
 const creditService = require('../services/creditService');
 const { createNotification } = require('../services/notificationService');
+const { archiveVideo, archiveImage } = require('../services/storageService');
 
 /**
  * POST /api/generate
@@ -112,7 +113,7 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
       estimatedCost
     });
 
-    // 7. Dispatch fal.ai Generation in the background
+    // 7. Dispatch Replicate Generation in the background
     (async () => {
       try {
         // Update status to 'processing'
@@ -121,12 +122,12 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
           .update({ status: 'processing' })
           .eq('id', generation.id);
 
-        console.log(`[BackgroundWorker] Executing fal.ai job for gen: ${generation.id}`);
+        console.log(`[BackgroundWorker] Executing Replicate job for gen: ${generation.id}`);
 
         const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
         const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
 
-        const result = await falService.generateVideo({
+        const result = await replicateService.generateVideo({
           endpoint: model.fal_endpoint,
           prompt: prompt,
           duration: selectedDuration,
@@ -139,21 +140,57 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
         });
 
         if (result.request_id) {
-          // Store request ID in DB to track it
+          // Store prediction ID in DB to track it
           await supabase
             .from('generations')
             .update({ fal_request_id: result.request_id })
             .eq('id', generation.id);
+
+          // Local webhook simulation / polling
+          const isLocalhost = webhookUrl.includes('localhost') || webhookUrl.includes('127.0.0.1');
+          if (isLocalhost) {
+            console.log(`[BackgroundWorker] Localhost environment detected. Initiating background prediction polling for: ${result.request_id}`);
+            (async () => {
+              try {
+                let status = 'starting';
+                let currentResult = null;
+
+                // Poll status every 3 seconds up to 100 times (5 minutes limit)
+                for (let attempt = 0; attempt < 100; attempt++) {
+                  await new Promise(resolve => setTimeout(resolve, 3000));
+                  currentResult = await replicateService.getPredictionStatus(result.request_id);
+                  status = currentResult.status;
+
+                  if (status === 'succeeded' || status === 'failed' || status === 'canceled') {
+                    break;
+                  }
+                }
+
+                if (status === 'succeeded') {
+                  console.log(`[BackgroundWorker] Local poll completed successfully for: ${generation.id}`);
+                  await handleWebhookLogic(generation.id, 'OK', currentResult.output, null);
+                } else {
+                  console.error(`[BackgroundWorker] Local poll failed/timed out for: ${generation.id}. Status: ${status}`);
+                  await handleWebhookLogic(generation.id, 'ERROR', null, currentResult?.error || 'Replicate polling timeout or failed');
+                }
+              } catch (pollErr) {
+                console.error(`[BackgroundWorker] Local poll critical error for: ${generation.id}`, pollErr);
+                await handleWebhookLogic(generation.id, 'ERROR', null, pollErr.message);
+              }
+            })();
+          }
         } else if (result.video_url) {
           // Synchronous fallback success
+          console.log(`[BackgroundWorker] Synchronous result returned. Archiving video files.`);
+          const permanentVideoUrl = await archiveVideo(result.video_url, req.user.id, generation.id);
           const placeholderThumbnail = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500';
+
           await supabase
             .from('generations')
             .update({
               status: 'completed',
-              video_url: result.video_url,
-              thumbnail_url: placeholderThumbnail,
-              updated_at: new Date().toISOString()
+              video_url: permanentVideoUrl,
+              thumbnail_url: placeholderThumbnail
             })
             .eq('id', generation.id);
 
@@ -168,30 +205,16 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
       } catch (err) {
         console.error(`[BackgroundWorker] Generation failed for: ${generation.id}`, err);
 
-        // Refund user balances instantly on failure
+        // Refund user balances atomically on failure
         try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('credits')
-            .eq('id', req.user.id)
-            .single();
-
-          const currentCredits = parseFloat(profile.credits || 0);
-          
-          await supabase
-            .from('profiles')
-            .update({ credits: currentCredits + estimatedCost })
-            .eq('id', req.user.id);
-
-          await supabase
-            .from('transactions')
-            .insert({
-              user_id: req.user.id,
-              type: 'refund',
-              amount: estimatedCost,
-              description: `Refund for failed generation ${generation.id}`,
-              generation_id: generation.id
-            });
+          await creditService.addCredits(
+            req.user.id,
+            parseFloat(estimatedCost),
+            `Refund for failed generation ${generation.id}`,
+            `refund-${generation.id}`,
+            `refund-${generation.id}`,
+            'refund'
+          );
 
           console.log(`[BackgroundWorker] Successfully refunded ₹${estimatedCost} to user: ${req.user.id}`);
         } catch (refundErr) {
@@ -203,8 +226,7 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
           .from('generations')
           .update({
             status: 'failed',
-            error_message: err.message || 'fal.ai subscription execution timeout.',
-            updated_at: new Date().toISOString()
+            error_message: err.message || 'Replicate execution error/timeout.'
           })
           .eq('id', generation.id);
 
@@ -225,10 +247,136 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
 });
 
 /**
+ * POST /api/generate/image
+ * Synchronous image generation via fal.ai (Flux Schnell / Flux Dev).
+ * Uses fixed base_cost from model — no duration needed.
+ */
+router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
+  const { prompt, model_id, aspect_ratio = '1:1' } = req.body;
+
+  if (!prompt || prompt.trim().length === 0) {
+    return res.status(400).json({ error: 'Please enter a prompt describing your image.' });
+  }
+  if (prompt.length > 500) {
+    return res.status(400).json({ error: 'Prompts cannot exceed 500 characters.' });
+  }
+  if (!model_id) {
+    return res.status(400).json({ error: 'Please select an image generation model.' });
+  }
+
+  try {
+    // 1. Fetch model (must be type 'image')
+    const { data: model, error: modelErr } = await supabase
+      .from('models')
+      .select('*')
+      .eq('id', model_id)
+      .eq('is_active', true)
+      .eq('model_type', 'image')
+      .single();
+
+    if (modelErr || !model) {
+      return res.status(404).json({ error: 'Selected image model is not available.' });
+    }
+
+    const cost = parseFloat(model.base_cost || 0);
+
+    // 2. Credit check
+    if (req.user.credits < cost) {
+      return res.status(400).json({
+        error: `Insufficient balance. This model costs ₹${cost.toFixed(2)} but you have ₹${req.user.credits.toFixed(2)}.`
+      });
+    }
+
+    // 3. Map aspect_ratio to fal.ai image_size param
+    const sizeMap = { '1:1': 'square_hd', '4:3': 'landscape_4_3', '3:4': 'portrait_4_3', '16:9': 'landscape_16_9', '9:16': 'portrait_16_9' };
+    const image_size = sizeMap[aspect_ratio] || 'landscape_4_3';
+
+    // 4. Create generation record
+    const defaultTitle = prompt.slice(0, 30).trim() + '...';
+    const { data: generation, error: dbErr } = await supabase
+      .from('generations')
+      .insert({
+        user_id: req.user.id,
+        title: defaultTitle,
+        prompt,
+        model_id: model.id,
+        model_name: model.name,
+        status: 'processing',
+        duration: 0,
+        resolution: image_size,
+        aspect_ratio,
+        cost,
+        generation_type: 'image',
+        is_public: false
+      })
+      .select()
+      .single();
+
+    if (dbErr || !generation) {
+      throw new Error(`Failed to initialize generation: ${dbErr?.message}`);
+    }
+
+    // 5. Deduct credits immediately
+    await creditService.deductCredits(
+      req.user.id,
+      cost,
+      `AI Image Generation: ${model.name}`,
+      generation.id
+    );
+
+    // 6. Call Replicate synchronously
+    let imageResult;
+    try {
+      imageResult = await replicateService.generateImage({
+        endpoint: model.fal_endpoint,
+        prompt,
+        aspect_ratio
+      });
+    } catch (repErr) {
+      // Refund on Replicate failure
+      await creditService.addCredits(
+        req.user.id,
+        cost,
+        `Refund for failed image generation ${generation.id}`,
+        `refund-${generation.id}`,
+        `refund-${generation.id}`,
+        'refund'
+      );
+      await supabase.from('generations').update({ status: 'failed', error_message: repErr.message }).eq('id', generation.id);
+      throw repErr;
+    }
+
+    // 7. Archive image permanently to Supabase Storage and mark completed
+    const permanentImageUrl = await archiveImage(imageResult.image_url, req.user.id, generation.id);
+
+    await supabase.from('generations').update({
+      status: 'completed',
+      video_url: permanentImageUrl,
+      thumbnail_url: permanentImageUrl
+    }).eq('id', generation.id);
+
+    await createNotification(req.user.id, 'Image Ready! 🖼️', `Your image from "${model.name}" is ready.`, 'success');
+
+    // 8. Respond synchronously (no polling needed)
+    res.status(200).json({
+      success: true,
+      generationId: generation.id,
+      image_url: permanentImageUrl,
+      cost
+    });
+
+  } catch (err) {
+    console.error('[generate/image] Error:', err);
+    res.status(500).json({ error: err.message || 'Image generation failed.' });
+  }
+});
+
+/**
  * GET /api/generate
  * Returns authenticated user's generation list (paginated)
  */
 router.get('/', authMiddleware, async (req, res) => {
+
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -270,35 +418,46 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 /**
- * POST /api/generate/webhook
- * fal.ai calls this when generation is complete
+ * Shared logic to process generation webhooks and development-mode queue polling results
  */
-router.post('/webhook', async (req, res) => {
+async function handleWebhookLogic(generationId, status, payload, errorMsg) {
   try {
-    const { generationId } = req.query;
-    const { status, payload, error } = req.body;
-    
-    if (!generationId) return res.status(400).send('No generationId');
-
     const { data: gen } = await supabase
       .from('generations')
       .select('*')
       .eq('id', generationId)
       .single();
 
-    if (!gen) return res.status(404).send('Not Found');
+    if (!gen) {
+      console.error(`[WebhookLogic] Generation record ${generationId} not found.`);
+      return;
+    }
 
-    if (status === 'OK') {
-      const videoUrl = payload?.video?.url || payload?.file?.url || payload?.outputs?.[0]?.url;
+    // Guard to prevent double processing
+    if (gen.status === 'completed' || gen.status === 'failed') {
+      console.log(`[WebhookLogic] Generation ${generationId} is already: ${gen.status}. Skipping.`);
+      return;
+    }
+
+    const isSuccess = status === 'OK' || status === 'succeeded';
+
+    if (isSuccess) {
+      const originalMediaUrl = replicateService.extractMediaUrl(payload) || payload?.video?.url || payload?.file?.url || payload?.outputs?.[0]?.url;
       const placeholderThumbnail = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500';
+
+      if (!originalMediaUrl) {
+        throw new Error('No valid media URL returned from Replicate.');
+      }
+
+      // Archive video permanently to Supabase Storage
+      const permanentVideoUrl = await archiveVideo(originalMediaUrl, gen.user_id, gen.id);
 
       await supabase
         .from('generations')
         .update({
           status: 'completed',
-          video_url: videoUrl,
-          thumbnail_url: placeholderThumbnail,
-          updated_at: new Date().toISOString()
+          video_url: permanentVideoUrl,
+          thumbnail_url: placeholderThumbnail
         })
         .eq('id', generationId);
 
@@ -309,42 +468,31 @@ router.post('/webhook', async (req, res) => {
         'success'
       );
       
-      const { sendVideoReadyEmail } = require('../services/emailService');
-      const { data: userProfile } = await supabase.from('profiles').select('email').eq('id', gen.user_id).single();
-      if (userProfile && userProfile.email) {
-         await sendVideoReadyEmail(userProfile.email, gen.title);
+      try {
+        const { sendVideoReadyEmail } = require('../services/emailService');
+        const { data: userProfile } = await supabase.from('profiles').select('email').eq('id', gen.user_id).single();
+        if (userProfile && userProfile.email) {
+           await sendVideoReadyEmail(userProfile.email, gen.title);
+        }
+      } catch (emailErr) {
+        console.error('[WebhookLogic] Non-critical email send failed:', emailErr);
       }
-    } else if (status === 'ERROR') {
-      // Refund
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('credits')
-        .eq('id', gen.user_id)
-        .single();
-
-      if (profile) {
-        await supabase
-          .from('profiles')
-          .update({ credits: parseFloat(profile.credits || 0) + gen.cost })
-          .eq('id', gen.user_id);
-
-        await supabase
-          .from('transactions')
-          .insert({
-            user_id: gen.user_id,
-            type: 'refund',
-            amount: gen.cost,
-            description: `Refund for failed generation ${generationId}`,
-            generation_id: generationId
-          });
-      }
+    } else {
+      // Refund credits atomically
+      await creditService.addCredits(
+        gen.user_id,
+        parseFloat(gen.cost),
+        `Refund for failed generation ${generationId}`,
+        `refund-${generationId}`,
+        `refund-${generationId}`,
+        'refund'
+      );
 
       await supabase
         .from('generations')
         .update({
           status: 'failed',
-          error_message: error || 'Generation failed on fal.ai',
-          updated_at: new Date().toISOString()
+          error_message: errorMsg || 'Generation failed on Replicate'
         })
         .eq('id', generationId);
 
@@ -355,7 +503,31 @@ router.post('/webhook', async (req, res) => {
         'error'
       );
     }
+  } catch (err) {
+    console.error(`[WebhookLogic] Exception during webhook execution for ${generationId}:`, err);
+    throw err;
+  }
+}
 
+/**
+ * POST /api/generate/webhook
+ * Replicate calls this when generation is complete
+ */
+router.post('/webhook', async (req, res) => {
+  try {
+    const { generationId } = req.query;
+    
+    if (!generationId) return res.status(400).send('No generationId');
+
+    // Handle both Replicate webhook payload format and legacy payload format
+    const isReplicate = !!req.body.id && typeof req.body.status === 'string';
+    const status = isReplicate 
+      ? (req.body.status === 'succeeded' ? 'OK' : 'ERROR')
+      : (req.body.status || 'OK');
+    const payload = isReplicate ? req.body.output : req.body.payload;
+    const error = isReplicate ? req.body.error : req.body.error;
+
+    await handleWebhookLogic(generationId, status, payload, error);
     res.status(200).send('OK');
   } catch (err) {
     console.error('Webhook processing failed:', err);
@@ -444,11 +616,12 @@ router.get('/:id', authMiddleware, async (req, res) => {
  * Updates video details (e.g. custom renaming or public gallery status)
  */
 router.patch('/:id', authMiddleware, async (req, res) => {
-  const { title, is_public } = req.body;
+  const { title, is_public, thumbnail_url } = req.body;
   const updates = {};
   
   if (title !== undefined) updates.title = title;
   if (is_public !== undefined) updates.is_public = !!is_public;
+  if (thumbnail_url !== undefined && typeof thumbnail_url === 'string') updates.thumbnail_url = thumbnail_url;
 
   try {
     const { data: gen, error } = await supabase

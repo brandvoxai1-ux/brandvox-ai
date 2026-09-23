@@ -4,7 +4,7 @@ import { useGeneration } from '../hooks/useGeneration';
 import { useAuth } from '../hooks/useAuth';
 import VideoCard from '../components/shared/VideoCard';
 import Topbar from '../components/layout/Topbar';
-import { Grid, List, Search, SlidersHorizontal, Film, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Grid, List, Search, SlidersHorizontal, Film, AlertTriangle, RefreshCw, Play } from 'lucide-react';
 import { formatDate, formatCredits } from '../lib/utils';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
