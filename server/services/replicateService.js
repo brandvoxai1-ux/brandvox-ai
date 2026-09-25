@@ -16,39 +16,43 @@ const replicate = new Replicate({
  * Maps legacy or fal.ai model endpoints to Replicate model identifiers
  */
 const REPLICATE_MODEL_MAP = {
-  // Image Models
-  'fal-ai/flux/schnell': 'prunaai/p-image-ideogram',
-  'fal-ai/flux/dev': 'prunaai/p-image-ideogram',
-  'nano-banana': 'prunaai/p-image-ideogram',
-  'chatgpt-image': 'prunaai/p-image-ideogram',
-  'p-image-ideogram': 'prunaai/p-image-ideogram',
+  // SOTA Image Models (2025/2026)
+  'fal-ai/flux/schnell': 'black-forest-labs/flux-schnell',
+  'fal-ai/flux/dev': 'black-forest-labs/flux-dev',
+  'nano-banana': 'black-forest-labs/flux-schnell',
+  'chatgpt-image': 'ideogram-ai/ideogram-v2',
+  'p-image-ideogram': 'black-forest-labs/flux-schnell',
+  'flux-schnell': 'black-forest-labs/flux-schnell',
+  'flux-dev': 'black-forest-labs/flux-dev',
+  'ideogram-v2': 'ideogram-ai/ideogram-v2',
   
-  // Video Models
+  // SOTA Video Models (2025/2026)
   'fal-ai/minimax/video-01': 'minimax/video-01',
   'minimax-hailuo': 'minimax/video-01',
   'fal-ai/kling-video/v1.6/standard/text-to-video': 'kuaishou/kling-v1',
   'kling-video-1-6': 'kuaishou/kling-v1',
   'fal-ai/wan/v2.5/text-to-video': 'wan-video/wan-2.1-1.3b',
   'wan-2-5-fast': 'wan-video/wan-2.1-1.3b',
-  'fal-ai/hunyuan-video': 'bytedance/animatediff-lightning-4-step',
-  'seedance-2-0-fast': 'bytedance/animatediff-lightning-4-step',
-  'seedance-2-fast': 'bytedance/animatediff-lightning-4-step',
-  'seedance-2': 'bytedance/animatediff-lightning-4-step',
+  'wan-2-1-14b': 'wan-video/wan-2.1-14b',
+  'fal-ai/hunyuan-video': 'wan-video/wan-2.1-1.3b',
+  'seedance-2-0-fast': 'wan-video/wan-2.1-1.3b',
+  'seedance-2-fast': 'wan-video/wan-2.1-1.3b',
+  'seedance-2': 'wan-video/wan-2.1-1.3b',
   'seedance-2-i2v': 'minimax/video-01',
-  'bytedance/seedance-2.0/fast/text-to-video': 'bytedance/animatediff-lightning-4-step',
-  'bytedance/seedance-2.0/text-to-video': 'bytedance/animatediff-lightning-4-step',
+  'bytedance/seedance-2.0/fast/text-to-video': 'wan-video/wan-2.1-1.3b',
+  'bytedance/seedance-2.0/text-to-video': 'wan-video/wan-2.1-1.3b',
   'bytedance/seedance-2.0/image-to-video': 'minimax/video-01'
 };
 
 /**
  * Resolves a model endpoint string to a valid Replicate model identifier
  */
-function resolveReplicateModel(endpoint, defaultModel = 'prunaai/p-image-ideogram') {
+function resolveReplicateModel(endpoint, defaultModel = 'black-forest-labs/flux-schnell') {
   if (!endpoint) return defaultModel;
   if (REPLICATE_MODEL_MAP[endpoint]) {
     return REPLICATE_MODEL_MAP[endpoint];
   }
-  // If already in owner/model format (e.g. prunaai/p-image-ideogram)
+  // If already in owner/model format (e.g. wan-video/wan-2.1-1.3b)
   if (endpoint.includes('/') && !endpoint.startsWith('fal-ai/')) {
     return endpoint;
   }
@@ -116,29 +120,24 @@ function getDimensions(aspectRatio) {
  * @returns {Promise<{ image_url: string, width: number, height: number, seed: null }>}
  */
 async function generateImage({ endpoint, prompt, aspect_ratio = '1:1' }) {
-  const model = resolveReplicateModel(endpoint, 'prunaai/p-image-ideogram');
+  const model = resolveReplicateModel(endpoint, 'black-forest-labs/flux-schnell');
   const dims = getDimensions(aspect_ratio);
 
   let input;
   if (model.includes('ideogram')) {
     input = {
-      width: dims.width,
-      height: dims.height,
       prompt,
-      thinking: 'high',
-      image_size: '1K',
-      aspect_ratio: dims.aspect_ratio,
+      aspect_ratio: dims.aspect_ratio || '1:1',
       output_format: 'jpg',
-      output_quality: 80,
-      prompt_upsampling: true
+      output_quality: 90
     };
   } else {
-    // Flux or standard image generator
+    // FLUX.1 Schnell / Dev
     input = {
       prompt,
-      aspect_ratio: dims.aspect_ratio,
-      output_format: 'jpg',
-      output_quality: 80
+      aspect_ratio: dims.aspect_ratio || '1:1',
+      output_format: 'webp',
+      output_quality: 90
     };
   }
 
@@ -175,13 +174,19 @@ async function generateImage({ endpoint, prompt, aspect_ratio = '1:1' }) {
 async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ratio, generate_audio, image_url, webhookUrl, generationId }) {
   const model = resolveReplicateModel(endpoint, 'minimax/video-01');
 
-  const input = {
-    prompt,
-    prompt_optimizer: true
-  };
+  const input = { prompt };
 
-  if (image_url) {
-    input.first_frame_image = image_url;
+  if (model.includes('minimax')) {
+    input.prompt_optimizer = true;
+    if (image_url) input.first_frame_image = image_url;
+  } else if (model.includes('wan')) {
+    // Wan 2.1 SOTA accepts aspect_ratio ('16:9', '9:16', '1:1')
+    input.aspect_ratio = aspect_ratio || '16:9';
+    if (image_url) input.image = image_url;
+  } else if (model.includes('kling')) {
+    if (image_url) input.start_image = image_url;
+  } else {
+    if (image_url) input.first_frame_image = image_url;
   }
 
   try {

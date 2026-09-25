@@ -1,217 +1,292 @@
 // client/src/data/templatesData.js
 /**
- * Curated catalog of trending video and image prompt templates for BrandVox AI
+ * Curated catalog of trending viral video and image prompt templates for BrandVox AI
+ * Powered by SOTA models: Wan 2.1, MiniMax Hailuo Video-01, Kling v1.6, and FLUX.1 Schnell
  */
 
 export const TEMPLATE_CATEGORIES = [
-  { id: 'all', label: 'All Templates' },
-  { id: 'reels', label: '📱 Instagram & TikTok Reels' },
-  { id: 'ecommerce', label: '🛍️ E-Commerce Ads' },
-  { id: 'cinematic', label: '🎬 Cinematic & Sci-Fi' },
-  { id: 'anime', label: '⛩️ Anime & Stylized' },
-  { id: 'images', label: '🎨 Art & Typography' }
+  { id: 'all', label: '🔥 All Trending Templates' },
+  { id: 'reels', label: '📱 Viral Reels & TikTok Hooks' },
+  { id: 'ecommerce', label: '🛍️ 3D Luxury Product Ads' },
+  { id: 'cinematic', label: '🎬 Hollywood Cinema & VFX' },
+  { id: 'anime', label: '⛩️ Makoto Shinkai & Anime' },
+  { id: 'images', label: '🎨 FLUX.1 8K & Typography' }
 ];
 
 export const TEMPLATES = [
-  // 1. REELS & SOCIAL HOOKS
+  // ==========================================
+  // 1. VIRAL REELS & TIKTOK HOOKS (9:16 Vertical)
+  // ==========================================
   {
     id: 'tpl-reels-cyberpunk-walk',
-    title: 'Cyberpunk Neon Street Walk',
+    title: 'Cyberpunk Tokyo Neon Street Walk',
     category: 'reels',
     media_type: 'video',
-    badge: 'Trending Hook',
+    badge: '🔥 Viral Hook (9:16)',
     preview_image_url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800&auto=format&fit=crop',
     preview_video_url: 'https://fxqvuxpybrmkjedaqqrp.supabase.co/storage/v1/object/public/videos/18ac91ae-280a-40dd-9605-433025042f2f/df339c6a-9802-41f9-8b3e-32db5fe38bef.mp4',
-    prompt: 'Cinematic slow-motion vertical tracking shot of a mysterious figure in a dark trench coat walking through a neon-drenched futuristic Tokyo street, holographic neon reflections on wet asphalt, volumetric cyan and magenta steam, 8k realism',
-    model_id: 'minimax-hailuo',
-    model_name: 'MiniMax Hailuo',
+    prompt: 'Vertical 9:16 cinematic slow-motion tracking shot of a mysterious cyberpunk figure in a dark metallic trenchcoat walking through a rain-drenched futuristic Tokyo street, vivid holographic neon reflections on asphalt, volumetric cyan and magenta fog, anamorphic lens, 8k photorealism',
+    model_id: 'wan-2-5-fast',
+    model_name: 'Wan 2.1 SOTA Video',
     aspect_ratio: '9:16',
     duration: 6,
-    tags: ['Reel', 'Cyberpunk', 'Neon', 'Urban'],
-    uses_count: 2450
+    tags: ['Reel', 'Cyberpunk', 'Neon', 'Trending', 'Wan2.1'],
+    uses_count: 8420
   },
   {
-    id: 'tpl-reels-streetwear-motion',
-    title: 'Urban Streetwear Slow-Motion',
+    id: 'tpl-reels-fashion-runway',
+    title: 'Hyper-Realistic High Fashion Runway Zoom',
     category: 'reels',
     media_type: 'video',
-    badge: 'Fashion Viral',
+    badge: '💎 Trending Fashion',
     preview_image_url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop',
-    preview_video_url: 'https://assets.mixkit.co/videos/preview/mixkit-fashion-model-in-neon-light-39879-large.mp4',
-    prompt: 'Low-angle fashion runway tracking shot of a model wearing oversized [Color/Brand] technical streetwear jacket, walking forward through gentle atmospheric mist, dynamic rim lighting, smooth 60fps slow-motion motion blur',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    prompt: 'Ultra-photorealistic vertical 9:16 runway tracking shot, high fashion supermodel walking forward wearing an avant-garde luminescent pleated metallic gown, subtle wind blowing hair, dynamic strobe and rim stage lighting, 60fps cinematic fluidity, shot on Arri Alexa 65',
     model_id: 'minimax-hailuo',
-    model_name: 'MiniMax Hailuo',
+    model_name: 'MiniMax Hailuo Video-01',
     aspect_ratio: '9:16',
     duration: 6,
-    tags: ['Streetwear', 'Fashion', 'SlowMo', 'Viral'],
-    uses_count: 1890
+    tags: ['Fashion', 'Runway', 'Vogue', 'MiniMax', '4K'],
+    uses_count: 6190
   },
   {
     id: 'tpl-reels-dancing-robot',
-    title: 'Futuristic Robot Dance Reel',
+    title: 'Sleek Humanoid Robot Dance Hook',
     category: 'reels',
     media_type: 'video',
-    badge: 'Viral Sound',
+    badge: '🚀 Viral Sound Sync',
     preview_image_url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop',
     preview_video_url: 'https://fxqvuxpybrmkjedaqqrp.supabase.co/storage/v1/object/public/videos/18ac91ae-280a-40dd-9605-433025042f2f/df339c6a-9802-41f9-8b3e-32db5fe38bef.mp4',
-    prompt: 'A sleek white and chrome humanoid robot performing a smooth hip-hop dance routine on an illuminated LED studio dancefloor, synchronized fluid joints, reflections on glossy floor, cinematic stage lights',
+    prompt: 'Vertical 9:16 smooth camera dolly around a futuristic white and mirror-chrome humanoid robot performing a high-energy fluid dance on a glossy LED studio floor, sharp reflections, neon light pulses synchronized with movement, hyper-realistic mechanical joints',
     model_id: 'minimax-hailuo',
-    model_name: 'MiniMax Hailuo',
+    model_name: 'MiniMax Hailuo Video-01',
     aspect_ratio: '9:16',
     duration: 6,
-    tags: ['Robot', 'Dance', 'CGI', 'SciFi'],
-    uses_count: 3210
+    tags: ['AI Robot', 'Dance', 'TikTok', 'Viral', 'Hailuo'],
+    uses_count: 5310
+  },
+  {
+    id: 'tpl-reels-luxury-travel',
+    title: 'POV First-Person Amalfi Super-Yacht',
+    category: 'reels',
+    media_type: 'video',
+    badge: '☀️ Luxury Lifestyle',
+    preview_image_url: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&auto=format&fit=crop',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    prompt: 'Vertical 9:16 first-person POV shot stepping onto the sun-drenched teak wood deck of an ultra-luxury superyacht cruising along the dramatic cliffs of Amalfi Coast Italy, crystal turquoise sea waves splashing gently, golden hour Mediterranean sunset lighting, cinematic travel vlog',
+    model_id: 'wan-2-5-fast',
+    model_name: 'Wan 2.1 SOTA Video',
+    aspect_ratio: '9:16',
+    duration: 6,
+    tags: ['Luxury', 'Travel', 'Yacht', 'POV', 'Reel'],
+    uses_count: 4890
   },
 
-  // 2. E-COMMERCE & PRODUCT ADS
+  // ==========================================
+  // 2. 3D LUXURY PRODUCT ADS (E-Commerce)
+  // ==========================================
   {
     id: 'tpl-ecom-perfume-splash',
-    title: 'Luxury Perfume Water Splash',
+    title: 'Luxury Matte Black Perfume Splash',
     category: 'ecommerce',
     media_type: 'video',
-    badge: 'High Conversion',
-    preview_image_url: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=800&auto=format&fit=crop',
-    preview_video_url: 'https://assets.mixkit.co/videos/preview/mixkit-water-splashing-in-slow-motion-1191-large.mp4',
-    prompt: 'Ultra slow-motion cinematic macro shot of an elegant frosted glass perfume bottle plunging into crystal clear turquoise water, thousands of micro-droplets exploding upward in zero gravity, studio luxury key lighting, pristine refraction',
-    model_id: 'minimax-hailuo',
-    model_name: 'MiniMax Hailuo',
-    aspect_ratio: '1:1',
-    duration: 6,
-    tags: ['Commercial', 'Luxury', 'Splash', 'Product'],
-    uses_count: 4120
-  },
-  {
-    id: 'tpl-ecom-sneaker-levitate',
-    title: 'Zero-Gravity Sneaker Spin',
-    category: 'ecommerce',
-    media_type: 'video',
-    badge: 'Footwear Ad',
-    preview_image_url: 'https://images.unsplash.com/photo-1552346154-21d32810aba3?w=800&auto=format&fit=crop',
-    preview_video_url: 'https://assets.mixkit.co/videos/preview/mixkit-neon-lights-and-smoke-40156-large.mp4',
-    prompt: 'Commercial product shot of a futuristic athletic running shoe hovering in mid-air against a deep obsidian background, slowly rotating 360 degrees, glowing fiber optic laces, subtle ambient smoke swirls, commercial studio rim lighting',
-    model_id: 'minimax-hailuo',
-    model_name: 'MiniMax Hailuo',
+    badge: '🏆 High Converting Ad',
+    preview_image_url: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=800&auto=format&fit=crop',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    prompt: 'Commercial 3D product animation, a luxury square matte-black perfume bottle embossed with embossed metallic gold typography "ELIXIR", rotating in 120fps super slow motion, surrounded by exploding water ripples and crystal droplet splashes against an obsidian reflective pedestal, studio softbox rim lighting',
+    model_id: 'kling-video-1-6',
+    model_name: 'Kling v1.6 Cinematic',
     aspect_ratio: '9:16',
     duration: 6,
-    tags: ['Sneakers', '360Spin', 'Ecommerce', 'Motion'],
-    uses_count: 2780
+    tags: ['ProductAd', 'Perfume', 'Splash', 'Commercial', 'Kling'],
+    uses_count: 7340
   },
   {
-    id: 'tpl-ecom-coffee-crema',
-    title: 'Rich Coffee Bean Vortex',
+    id: 'tpl-ecom-cyber-sneaker',
+    title: 'Zero-Gravity Cyber-Sneaker Floating Ad',
     category: 'ecommerce',
     media_type: 'video',
-    badge: 'Food & Beverage',
-    preview_image_url: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800&auto=format&fit=crop',
-    preview_video_url: 'https://assets.mixkit.co/videos/preview/mixkit-coffee-beans-falling-in-slow-motion-42528-large.mp4',
-    prompt: 'Macro extreme slow-motion shot of dark roasted oily coffee beans cascading into an artisanal ceramic cup, rich aromatic steam curling upward in warm morning sunbeams, golden light rimming the velvety crema',
-    model_id: 'kling-video-1-6',
-    model_name: 'Kling Video',
-    aspect_ratio: '16:9',
+    badge: '⚡ Sneakerhead Viral',
+    preview_image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    prompt: 'Commercial advertising video of a futuristic high-top athletic sneaker rotating slowly in zero gravity, glowing neon cyan sole accents, shoelaces untying and hovering weightlessly in mid-air, dynamic camera 360 rotation, dramatic smoky studio background with purple rim light',
+    model_id: 'wan-2-5-fast',
+    model_name: 'Wan 2.1 SOTA Video',
+    aspect_ratio: '9:16',
     duration: 6,
-    tags: ['Coffee', 'Cafe', 'Macro', 'Commercial'],
-    uses_count: 1540
-  },
-
-  // 3. CINEMATIC & SCI-FI
-  {
-    id: 'tpl-cine-hypercar-drift',
-    title: 'Matte-Black Hypercar Drift',
-    category: 'cinematic',
-    media_type: 'video',
-    badge: 'Automotive Cinema',
-    preview_image_url: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=800&auto=format&fit=crop',
-    preview_video_url: 'https://assets.mixkit.co/videos/preview/mixkit-sports-car-drifting-at-night-41584-large.mp4',
-    prompt: 'Cinematic tracking drone shot of a menacing matte black futuristic sports car drifting aggressively around a wet city hairpin curve at midnight, burning rubber tire smoke, glowing red taillight streaks, Hollywood action camera angle',
-    model_id: 'kling-video-1-6',
-    model_name: 'Kling Video',
-    aspect_ratio: '16:9',
-    duration: 6,
-    tags: ['Supercar', 'Drift', 'Cinematic', 'Night'],
-    uses_count: 3680
+    tags: ['Sneakers', 'NikeStyle', 'Product', '3D', 'Wan2.1'],
+    uses_count: 6780
   },
   {
-    id: 'tpl-cine-interstellar-launch',
-    title: 'Interstellar Starship Launch',
-    category: 'cinematic',
+    id: 'tpl-ecom-iced-energy-can',
+    title: 'Frost & Droplet Chilled Energy Drink Reveal',
+    category: 'ecommerce',
     media_type: 'video',
-    badge: 'Sci-Fi Epic',
-    preview_image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop',
-    preview_video_url: 'https://assets.mixkit.co/videos/preview/mixkit-flying-through-the-stars-in-space-39870-large.mp4',
-    prompt: 'Epic wide cinematic shot of a massive colonial starship igniting twin cobalt-blue fusion thrusters over an alien ocean world, colossal shockwaves rippling across purple water, cinematic lens flare, IMAX composition',
+    badge: '🧊 Beverage Commercial',
+    preview_image_url: 'https://images.unsplash.com/photo-1622543925917-763c34d1a86e?w=800&auto=format&fit=crop',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    prompt: 'Macro commercial shot of a sleek matte black and electric lime aluminium beverage can covered in frosty ice condensation, crisp droplets slowly sliding down the cold metal can, dynamic lighting highlighting the metallic surface, ice cubes bursting upward in slow motion',
+    model_id: 'kling-video-1-6',
+    model_name: 'Kling v1.6 Cinematic',
+    aspect_ratio: '9:16',
+    duration: 6,
+    tags: ['Beverage', 'Can', 'Macro', 'Commercial', 'Kling'],
+    uses_count: 4210
+  },
+  {
+    id: 'tpl-ecom-diamond-chronograph',
+    title: 'Luxury Swiss Chronograph in Molten Gold',
+    category: 'ecommerce',
+    media_type: 'video',
+    badge: '👑 Ultra Luxury',
+    preview_image_url: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&auto=format&fit=crop',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    prompt: 'Cinematic commercial macro shot of a Swiss rose-gold skeleton automatic wristwatch emerging slowly from liquid black oil and molten gold ripples, ticking gears visible through sapphire crystal, flawless macro reflections, premium luxury commercial aesthetic',
     model_id: 'minimax-hailuo',
-    model_name: 'MiniMax Hailuo',
+    model_name: 'MiniMax Hailuo Video-01',
     aspect_ratio: '16:9',
     duration: 6,
-    tags: ['Spaceship', 'SciFi', 'IMAX', 'Epic'],
-    uses_count: 2990
+    tags: ['Watch', 'Luxury', 'Gold', 'Macro', 'Commercial'],
+    uses_count: 5120
   },
 
-  // 4. ANIME & STYLIZED
+  // ==========================================
+  // 3. HOLLYWOOD CINEMA & SCI-FI (16:9)
+  // ==========================================
   {
-    id: 'tpl-anime-twilight-city',
-    title: 'Anime Girl on Skyscraper Rooftop',
+    id: 'tpl-cine-supercar-drift',
+    title: 'Midnight Supercar Wet Asphalt Drift',
+    category: 'cinematic',
+    media_type: 'video',
+    badge: '🏎️ Fast & Furious VFX',
+    preview_image_url: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=800&auto=format&fit=crop',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    prompt: 'Low-angle tracking drone shot of a menacing matte black futuristic hypercar power-sliding aggressively around a wet city hairpin curve at midnight, burning rubber tire smoke illuminated by neon headlights, glowing red taillight streaks, Hollywood blockbuster movie cinematography, IMAX 70mm',
+    model_id: 'kling-video-1-6',
+    model_name: 'Kling v1.6 Cinematic',
+    aspect_ratio: '16:9',
+    duration: 6,
+    tags: ['Supercar', 'Drift', 'Cinematic', 'IMAX', 'Kling'],
+    uses_count: 9120
+  },
+  {
+    id: 'tpl-cine-interstellar-warp',
+    title: 'Interstellar Starship Warp Ignition',
+    category: 'cinematic',
+    media_type: 'video',
+    badge: '🌌 Sci-Fi Masterpiece',
+    preview_image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    prompt: 'Epic wide cinematic shot of a massive colonial starship igniting twin cobalt-blue fusion warp engines above an alien ocean planet, gigantic cosmic shockwaves rippling through purple planetary rings, blinding lens flare, Hans Zimmer epic cinematic scale',
+    model_id: 'wan-2-5-fast',
+    model_name: 'Wan 2.1 SOTA Video',
+    aspect_ratio: '16:9',
+    duration: 6,
+    tags: ['Space', 'SciFi', 'IMAX', 'Epic', 'Wan2.1'],
+    uses_count: 7890
+  },
+  {
+    id: 'tpl-cine-cyber-dragon',
+    title: 'Cybernetic Dragon Flying Over Neo-Tokyo',
+    category: 'cinematic',
+    media_type: 'video',
+    badge: '🐉 Mythic Sci-Fi',
+    preview_image_url: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&auto=format&fit=crop',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    prompt: 'Colossal mechanical cybernetic dragon with glowing cyan circuitry soaring gracefully through storm clouds between neon skyscrapers of a rain-drenched Neo-Tokyo, lightning illuminating titanium scales, volumetric fog and cinematic depth of field',
+    model_id: 'wan-2-5-fast',
+    model_name: 'Wan 2.1 SOTA Video',
+    aspect_ratio: '16:9',
+    duration: 6,
+    tags: ['Dragon', 'Cyberpunk', 'VFX', 'Cinema'],
+    uses_count: 6410
+  },
+
+  // ==========================================
+  // 4. MAKOTO SHINKAI & ANIME SOTA (16:9 & 9:16)
+  // ==========================================
+  {
+    id: 'tpl-anime-shinkai-twilight',
+    title: 'Shinjuku Rooftop Twilight Shooting Stars',
     category: 'anime',
     media_type: 'video',
-    badge: 'Makoto Shinkai Style',
+    badge: '⛩️ Makoto Shinkai Style',
     preview_image_url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop',
-    preview_video_url: 'https://assets.mixkit.co/videos/preview/mixkit-clouds-moving-over-a-city-at-sunset-41484-large.mp4',
-    prompt: 'Breathtaking anime style cinematic scene, a young girl standing on a high-rise Tokyo rooftop at twilight looking up at shooting stars across a deep indigo and pastel orange sky, wind gently blowing her hair and uniform, Makoto Shinkai aesthetic',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    prompt: 'Breathtaking Makoto Shinkai style anime scene, a young girl standing on a Shinjuku high-rise rooftop at twilight looking up at twin shooting comets crossing a pastel indigo and amber sunset sky, gentle breeze swaying her hair, magical glowing dust particles, vivid emotional lighting, 4K anime masterpiece',
     model_id: 'wan-2-5-fast',
-    model_name: 'Wan 2.5 Fast',
+    model_name: 'Wan 2.1 SOTA Video',
     aspect_ratio: '16:9',
     duration: 6,
-    tags: ['Anime', 'Ghibli', 'Sky', 'Emotional'],
-    uses_count: 4890
+    tags: ['Anime', 'Shinkai', 'Sky', 'Ghibli', 'Emotional'],
+    uses_count: 11450
   },
   {
     id: 'tpl-anime-samurai-sakura',
     title: 'Samurai Sakura Blade Duel',
     category: 'anime',
     media_type: 'video',
-    badge: 'Action Animation',
+    badge: '⚔️ High-Speed Action',
     preview_image_url: 'https://images.unsplash.com/photo-1528164344705-475426879c0d?w=800&auto=format&fit=crop',
-    preview_video_url: 'https://assets.mixkit.co/videos/preview/mixkit-falling-pink-sakura-petals-41604-large.mp4',
-    prompt: 'Dynamic stylized Japanese anime duel in a misty bamboo grove, two samurai clashing steel katanas as luminous pink cherry blossom petals swirl furiously in the wind, dramatic camera rotation, high-energy impact sparks',
+    preview_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    prompt: 'Intense high-voltage anime katana clash in a moonlit misty bamboo grove, two samurai clashing curved steel blades as thousands of luminous pink cherry blossom petals swirl furiously in the vortex, electrical lightning sparks on impact, dynamic camera orbit, Ufotable Demon Slayer animation quality',
     model_id: 'minimax-hailuo',
-    model_name: 'MiniMax Hailuo',
+    model_name: 'MiniMax Hailuo Video-01',
     aspect_ratio: '16:9',
     duration: 6,
-    tags: ['Samurai', 'Anime', 'Sakura', 'Katana'],
-    uses_count: 2210
+    tags: ['Samurai', 'Anime', 'Action', 'Sakura', 'Katana'],
+    uses_count: 8320
   },
 
-  // 5. ART & TYPOGRAPHY IMAGES
+  // ==========================================
+  // 5. FLUX.1 8K & TYPOGRAPHY IMAGES
+  // ==========================================
   {
-    id: 'tpl-art-impasto-sunset',
-    title: 'Romantic Impasto Oil Painting',
+    id: 'tpl-art-flux-editorial-portrait',
+    title: 'FLUX.1 8K Haute Couture Editorial Portrait',
     category: 'images',
     media_type: 'image',
-    badge: 'Ideogram Featured',
-    preview_image_url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&auto=format&fit=crop',
+    badge: '📸 FLUX.1 Schnell 8K',
+    preview_image_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&auto=format&fit=crop',
     preview_video_url: null,
-    prompt: 'Two women in flowing pastel lavender and pale blue dresses, holding hands while walking on a beach at sunset, romantic impressionist oil painting with thick palette-knife impasto, soft pastel colors, gold leaf accents, and dreamy texture, with large painted letters: "BrandVox"',
+    prompt: 'Vogue editorial studio portrait of a woman with sculpted cheekbones and high-fashion geometric iridescent eye makeup, captured on Hasselblad H6D-100c, 85mm lens, f/1.4, flawless natural skin pores, dramatic chiaroscuro studio rim lighting, 8k resolution, award winning photography',
     model_id: 'p-image-ideogram',
-    model_name: 'P-Image Ideogram',
+    model_name: 'FLUX.1 Schnell 8K',
     aspect_ratio: '1:1',
     duration: 0,
-    tags: ['Painting', 'Oil', 'Impasto', 'Art'],
-    uses_count: 5120
+    tags: ['FLUX', 'Vogue', 'Portrait', 'Photography', '8K'],
+    uses_count: 14200
   },
   {
-    id: 'tpl-art-isometric-room',
-    title: '3D Isometric Cyberpunk Room',
+    id: 'tpl-art-neon-typography',
+    title: 'Glowing 3D Glass Neon Logo: "BRANDVOX"',
     category: 'images',
     media_type: 'image',
-    badge: '3D Render',
+    badge: '🔤 Ideogram Typography',
+    preview_image_url: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=800&auto=format&fit=crop',
+    preview_video_url: null,
+    prompt: 'Hyper-realistic glowing neon typography sign mounted on a dark wet industrial concrete wall, displaying the exact illuminated text "BRANDVOX AI", dual-tone vibrant violet and cyan gas tubes with realistic glass tube glow and wall reflections, cinematic Moody urban atmosphere',
+    model_id: 'chatgpt-image',
+    model_name: 'Ideogram v2 Typography',
+    aspect_ratio: '16:9',
+    duration: 0,
+    tags: ['Typography', 'Neon', 'Logo', 'Ideogram', 'Sign'],
+    uses_count: 12150
+  },
+  {
+    id: 'tpl-art-cozy-isometric-room',
+    title: 'Cozy Cyberpunk Lo-Fi Workspace',
+    category: 'images',
+    media_type: 'image',
+    badge: '🛋️ 3D Isometric Render',
     preview_image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop',
     preview_video_url: null,
-    prompt: 'Detailed 3D isometric cutaway view of a cozy cyberpunk developer bedroom, dual glowing curved monitors, potted plants, neon purple LED backlighting, steaming ramen bowl on desk, rainy window in background, Blender Cycles render style',
+    prompt: 'Detailed 3D isometric cutaway view of a cozy cyberpunk coder bedroom, dual glowing curved ultrawide monitors showing neon code, cascading potted monsteras and succulents, warm amber desk lamp, steaming mug of coffee, rainy cityscape seen through frosted glass window, Blender Octane 3D render style',
     model_id: 'p-image-ideogram',
-    model_name: 'P-Image Ideogram',
+    model_name: 'FLUX.1 Schnell 8K',
     aspect_ratio: '1:1',
     duration: 0,
-    tags: ['3D', 'Isometric', 'Blender', 'Cozy'],
-    uses_count: 3410
+    tags: ['3D', 'Isometric', 'Blender', 'Cozy', 'FLUX'],
+    uses_count: 9800
   }
 ];
