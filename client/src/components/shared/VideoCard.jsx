@@ -75,24 +75,30 @@ export default function VideoCard({
   );
   const thumbnailExtracted = useRef(false);
 
+  const isImage = video.generation_type === 'image' || (video.video_url && /\.(jpg|jpeg|png|webp)($|\?)/i.test(video.video_url));
+
   // Auto-extract thumbnail if the stored one is the Unsplash placeholder
   useEffect(() => {
     if (
       video.status === 'completed' &&
-      video.video_url &&
-      !thumbnail &&
-      !thumbnailExtracted.current
+      video.video_url
     ) {
-      thumbnailExtracted.current = true;
-      extractVideoThumbnail(video.video_url).then((dataUrl) => {
-        if (dataUrl) {
-          setThumbnail(dataUrl);
-          // Persist extracted thumbnail to DB silently (best-effort, no error shown to user)
-          api.patch(`/generate/${video.id}`, { thumbnail_url: dataUrl }).catch(() => {});
-        }
-      });
+      if (isImage) {
+        setThumbnail(video.video_url);
+        return;
+      }
+      if (!thumbnail && !thumbnailExtracted.current) {
+        thumbnailExtracted.current = true;
+        extractVideoThumbnail(video.video_url).then((dataUrl) => {
+          if (dataUrl) {
+            setThumbnail(dataUrl);
+            // Persist extracted thumbnail to DB silently (best-effort, no error shown to user)
+            api.patch(`/generate/${video.id}`, { thumbnail_url: dataUrl }).catch(() => {});
+          }
+        });
+      }
     }
-  }, [video.status, video.video_url]);
+  }, [video.status, video.video_url, isImage]);
 
   // ─── Download (gated for free users) ───────────────────────────────────────
   const handleDownload = async (e) => {
@@ -171,29 +177,37 @@ export default function VideoCard({
           video.video_url ? (
             <div className="relative w-full h-full cursor-pointer" onClick={() => onPlay && onPlay(video)}>
 
-              {/* Show extracted thumbnail as poster, hover plays the actual video */}
-              {hovered ? (
-                <video
+              {/* Media element: either Image or Video */}
+              {isImage ? (
+                <img
                   src={video.video_url}
-                  muted
-                  autoPlay
-                  playsInline
-                  loop
-                  className="w-full h-full object-cover"
+                  alt={video.title || 'AI Image'}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               ) : (
-                thumbnail ? (
-                  <img
-                    src={thumbnail}
-                    alt={video.title || 'Video thumbnail'}
+                hovered ? (
+                  <video
+                    src={video.video_url}
+                    muted
+                    autoPlay
+                    playsInline
+                    loop
                     className="w-full h-full object-cover"
-                    onError={() => setThumbnail(null)}
                   />
                 ) : (
-                  /* Thumbnail still extracting — show subtle loading state */
-                  <div className="w-full h-full bg-gradient-to-br from-surface-elevated to-black/60 flex items-center justify-center">
-                    <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
-                  </div>
+                  thumbnail ? (
+                    <img
+                      src={thumbnail}
+                      alt={video.title || 'Video thumbnail'}
+                      className="w-full h-full object-cover"
+                      onError={() => setThumbnail(null)}
+                    />
+                  ) : (
+                    /* Thumbnail still extracting — show subtle loading state */
+                    <div className="w-full h-full bg-gradient-to-br from-surface-elevated to-black/60 flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+                    </div>
+                  )
                 )
               )}
 
@@ -211,11 +225,11 @@ export default function VideoCard({
                 </>
               )}
 
-              {/* Hover play button */}
+              {/* Hover play/view button */}
               {hovered && (
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10 transition-opacity">
                   <button className="bg-primary hover:bg-primary-hover p-3 rounded-full text-white shadow-glow transform scale-110 active:scale-95 transition-all">
-                    <Play className="w-5 h-5 fill-current" />
+                    {isImage ? <Globe className="w-5 h-5" /> : <Play className="w-5 h-5 fill-current" />}
                   </button>
                 </div>
               )}
@@ -226,7 +240,7 @@ export default function VideoCard({
         ) : video.status === 'processing' ? (
           <div className="flex flex-col items-center justify-center p-4 w-full h-full bg-surface-elevated/40">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
-            <span className="text-xs text-white/50 tracking-wider">Generating video...</span>
+            <span className="text-xs text-white/50 tracking-wider">Generating {isImage ? 'image' : 'video'}...</span>
           </div>
         ) : video.status === 'failed' ? (
           <div className="flex flex-col items-center justify-center p-4 text-center w-full h-full bg-red-950/20">

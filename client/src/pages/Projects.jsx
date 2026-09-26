@@ -58,6 +58,18 @@ export default function Projects() {
     loadVideos(1, false);
   }, [profile?.id]);
 
+  // Auto-refresh library when any generation is currently processing or pending
+  useEffect(() => {
+    const hasActiveJobs = videos.some(v => v.status === 'processing' || v.status === 'pending');
+    if (!hasActiveJobs) return;
+
+    const interval = setInterval(() => {
+      loadVideos(currentPage, false);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [videos, currentPage]);
+
   // Client side filters
   const filteredVideos = videos
     .filter((v) => {

@@ -202,6 +202,7 @@ export default function Studio() {
           setGenerationStatus('processing');
           setGenerationProgress(p => Math.min(90, p + 5)); // Simulate incremental loading
         } else if (res.status === 'completed') {
+          const currentId = res.id || activeGenerationId;
           setGenerationStatus('completed');
           setGenerationProgress(100);
           setActiveGenerationId(null);
@@ -210,8 +211,15 @@ export default function Studio() {
           await loadStudioData();
           
           // Load generated asset directly to video panel
-          const completeDetails = await api.get(`/generate/${res.id || activeGenerationId}`);
-          setActiveVideo(completeDetails.data);
+          try {
+            const completeDetails = await api.get(`/generate/${currentId}`);
+            setActiveVideo(completeDetails.data);
+          } catch (fetchErr) {
+            console.warn('[Studio] Direct fetch fallback:', fetchErr);
+            if (res.video_url) {
+              setActiveVideo({ id: currentId, video_url: res.video_url, thumbnail_url: res.thumbnail_url });
+            }
+          }
           setGenerationStatus('idle');
         } else if (res.status === 'failed') {
           setGenerationStatus('failed');

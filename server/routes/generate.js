@@ -180,19 +180,22 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
             })();
           }
         } else if (result.video_url) {
-          // Synchronous fallback success
-          console.log(`[BackgroundWorker] Synchronous result returned. Archiving video files.`);
-          const permanentVideoUrl = await archiveVideo(result.video_url, req.user.id, generation.id);
+          // Synchronous fallback success - mark completed immediately
+          console.log(`[BackgroundWorker] Synchronous result returned. Updating generation ${generation.id} to completed.`);
           const placeholderThumbnail = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500';
 
-          await supabase
+          const { error: updErr } = await supabase
             .from('generations')
             .update({
               status: 'completed',
-              video_url: permanentVideoUrl,
+              video_url: result.video_url,
               thumbnail_url: placeholderThumbnail
             })
             .eq('id', generation.id);
+
+          if (updErr) {
+            console.error(`[BackgroundWorker] Database update failed for ${generation.id}:`, updErr);
+          }
 
           await createNotification(
             req.user.id,
@@ -200,6 +203,15 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
             `Your video generation with "${model.name}" has completed successfully.`,
             'success'
           );
+
+          // Archive permanently to Supabase Storage in the background
+          archiveVideo(result.video_url, req.user.id, generation.id)
+            .then(async (permanentVideoUrl) => {
+              if (permanentVideoUrl && permanentVideoUrl !== result.video_url) {
+                await supabase.from('generations').update({ video_url: permanentVideoUrl }).eq('id', generation.id);
+              }
+            })
+            .catch(err => console.warn('[BackgroundWorker] Archiving video warning:', err.message));
         }
 
       } catch (err) {
@@ -346,22 +358,36 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
       throw repErr;
     }
 
-    // 7. Archive image permanently to Supabase Storage and mark completed
-    const permanentImageUrl = await archiveImage(imageResult.image_url, req.user.id, generation.id);
-
-    await supabase.from('generations').update({
+    // 7. Mark generation completed immediately with generated image URL
+    const { error: imgUpdErr } = await supabase.from('generations').update({
       status: 'completed',
-      video_url: permanentImageUrl,
-      thumbnail_url: permanentImageUrl
+      video_url: imageResult.image_url,
+      thumbnail_url: imageResult.image_url
     }).eq('id', generation.id);
 
+    if (imgUpdErr) {
+      console.error(`[ImageHandler] Error updating generation ${generation.id}:`, imgUpdErr);
+    }
+
     await createNotification(req.user.id, 'Image Ready! 🖼️', `Your image from "${model.name}" is ready.`, 'success');
+
+    // Archive image asynchronously in background
+    archiveImage(imageResult.image_url, req.user.id, generation.id)
+      .then(async (permanentImageUrl) => {
+        if (permanentImageUrl && permanentImageUrl !== imageResult.image_url) {
+          await supabase.from('generations').update({
+            video_url: permanentImageUrl,
+            thumbnail_url: permanentImageUrl
+          }).eq('id', generation.id);
+        }
+      })
+      .catch(err => console.warn('[ImageHandler] Non-critical image archive warning:', err.message));
 
     // 8. Respond synchronously (no polling needed)
     res.status(200).json({
       success: true,
       generationId: generation.id,
-      image_url: permanentImageUrl,
+      image_url: imageResult.image_url,
       cost
     });
 
@@ -449,17 +475,19 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
         throw new Error('No valid media URL returned from Replicate.');
       }
 
-      // Archive video permanently to Supabase Storage
-      const permanentVideoUrl = await archiveVideo(originalMediaUrl, gen.user_id, gen.id);
-
-      await supabase
+      // Mark completed immediately so frontend and user can view/play right away
+      const { error: webUpdErr } = await supabase
         .from('generations')
         .update({
           status: 'completed',
-          video_url: permanentVideoUrl,
+          video_url: originalMediaUrl,
           thumbnail_url: placeholderThumbnail
         })
         .eq('id', generationId);
+
+      if (webUpdErr) {
+        console.error(`[WebhookLogic] Failed to mark completed for ${generationId}:`, webUpdErr);
+      }
 
       await createNotification(
         gen.user_id,
@@ -467,6 +495,15 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
         `Your video generation with "${gen.model_name}" has completed successfully.`,
         'success'
       );
+
+      // Archive video permanently in the background
+      archiveVideo(originalMediaUrl, gen.user_id, gen.id)
+        .then(async (permanentVideoUrl) => {
+          if (permanentVideoUrl && permanentVideoUrl !== originalMediaUrl) {
+            await supabase.from('generations').update({ video_url: permanentVideoUrl }).eq('id', generationId);
+          }
+        })
+        .catch(err => console.warn('[WebhookLogic] Background archiving warning:', err.message));
       
       try {
         const { sendVideoReadyEmail } = require('../services/emailService');
@@ -562,6 +599,7 @@ router.get('/:id/status', authMiddleware, async (req, res) => {
     const watermarkRequired = (purchaseCount || 0) === 0;
 
     res.json({
+      id: gen.id,
       status: gen.status,
       video_url: gen.video_url,
       thumbnail_url: gen.thumbnail_url,
