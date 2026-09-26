@@ -26,7 +26,7 @@ export function useGeneration() {
   const createGeneration = async (payload) => {
     setError(null);
     try {
-      const res = await api.post('/generate', payload);
+      const res = await api.post('/generate', payload, { timeout: 180000 });
       return res.data;
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.message || 'Failed to dispatch generation job.';
@@ -38,7 +38,7 @@ export function useGeneration() {
   const createImageGeneration = async (payload) => {
     setError(null);
     try {
-      const res = await api.post('/generate/image', payload);
+      const res = await api.post('/generate/image', payload, { timeout: 180000 });
       return res.data; // { success, generationId, image_url, cost }
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.message || 'Failed to generate image.';

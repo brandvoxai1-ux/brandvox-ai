@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api'),
-  timeout: 30000,
+  timeout: 120000, // 120s (2 minutes) to ensure AI generation pipelines are never interrupted prematurely
   headers: {
     'Content-Type': 'application/json'
   }

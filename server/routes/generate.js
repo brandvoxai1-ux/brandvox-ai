@@ -264,6 +264,9 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
  * Uses fixed base_cost from model — no duration needed.
  */
 router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
+  req.setTimeout(180000); // 3 minutes timeout to allow diffusion GPU rendering
+  res.setTimeout(180000);
+
   const { prompt, model_id, aspect_ratio = '1:1' } = req.body;
 
   if (!prompt || prompt.trim().length === 0) {
