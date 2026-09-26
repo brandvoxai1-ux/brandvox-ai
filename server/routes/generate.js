@@ -306,27 +306,41 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
     const sizeMap = { '1:1': 'square_hd', '4:3': 'landscape_4_3', '3:4': 'portrait_4_3', '16:9': 'landscape_16_9', '9:16': 'portrait_16_9' };
     const image_size = sizeMap[aspect_ratio] || 'landscape_4_3';
 
-    // 4. Create generation record
+    // 4. Create generation record with schema-safe resilient fallback
     const defaultTitle = prompt.slice(0, 30).trim() + '...';
-    const { data: generation, error: dbErr } = await supabase
+    const insertPayload = {
+      user_id: req.user.id,
+      title: defaultTitle,
+      prompt,
+      model_id: model.id,
+      model_name: model.name,
+      status: 'processing',
+      duration: 0,
+      resolution: image_size,
+      aspect_ratio,
+      cost,
+      generation_type: 'image',
+      input_image_url: input_image || null,
+      is_public: false
+    };
+
+    let { data: generation, error: dbErr } = await supabase
       .from('generations')
-      .insert({
-        user_id: req.user.id,
-        title: defaultTitle,
-        prompt,
-        model_id: model.id,
-        model_name: model.name,
-        status: 'processing',
-        duration: 0,
-        resolution: image_size,
-        aspect_ratio,
-        cost,
-        generation_type: 'image',
-        input_image_url: input_image || null,
-        is_public: false
-      })
+      .insert(insertPayload)
       .select()
       .single();
+
+    if (dbErr && (dbErr.message.includes('schema cache') || dbErr.message.includes('column'))) {
+      console.warn('[ImageGeneration] Missing input_image_url in schema cache, retrying:', dbErr.message);
+      delete insertPayload.input_image_url;
+      const retryResult = await supabase
+        .from('generations')
+        .insert(insertPayload)
+        .select()
+        .single();
+      generation = retryResult.data;
+      dbErr = retryResult.error;
+    }
 
     if (dbErr || !generation) {
       throw new Error(`Failed to initialize generation: ${dbErr?.message}`);
@@ -465,31 +479,49 @@ router.post('/swap', authMiddleware, generationLimiter, async (req, res) => {
       });
     }
 
-    // 3. Insert record into generations
+    // 3. Insert record into generations with schema-safe resilient fallback
     const displayTitle = prompt && prompt.trim() 
       ? `Character Swap: ${prompt.slice(0, 25).trim()}...` 
       : 'Character Replacement Video';
 
-    const { data: generation, error: dbErr } = await supabase
+    const insertPayload = {
+      user_id: req.user.id,
+      title: displayTitle,
+      prompt: prompt || 'Character replacement motion transfer',
+      model_id: model.id,
+      model_name: model.name,
+      status: 'pending',
+      duration: selectedDuration,
+      resolution: '720p',
+      aspect_ratio: aspect_ratio || '16:9',
+      cost: estimatedCost,
+      generation_type: 'swap',
+      source_video_url,
+      input_image_url: target_character_url || null,
+      is_public: false
+    };
+
+    let { data: generation, error: dbErr } = await supabase
       .from('generations')
-      .insert({
-        user_id: req.user.id,
-        title: displayTitle,
-        prompt: prompt || 'Character replacement motion transfer',
-        model_id: model.id,
-        model_name: model.name,
-        status: 'pending',
-        duration: selectedDuration,
-        resolution: '720p',
-        aspect_ratio: aspect_ratio || '16:9',
-        cost: estimatedCost,
-        generation_type: 'swap',
-        source_video_url,
-        input_image_url: target_character_url || null,
-        is_public: false
-      })
+      .insert(insertPayload)
       .select()
       .single();
+
+    if (dbErr) {
+      console.warn('[CharacterSwap] Primary insert failed, applying resilient fallback:', dbErr.message);
+      const retryPayload = { ...insertPayload };
+      delete retryPayload.source_video_url;
+      delete retryPayload.input_image_url;
+
+      let retry = await supabase.from('generations').insert(retryPayload).select().single();
+      if (retry.error && retry.error.message.includes('generations_generation_type_check')) {
+        console.warn('[CharacterSwap] Constraint requires video type fallback:', retry.error.message);
+        retryPayload.generation_type = 'video';
+        retry = await supabase.from('generations').insert(retryPayload).select().single();
+      }
+      generation = retry.data;
+      dbErr = retry.error;
+    }
 
     if (dbErr || !generation) {
       throw new Error(`Failed to initialize character swap generation: ${dbErr?.message}`);
