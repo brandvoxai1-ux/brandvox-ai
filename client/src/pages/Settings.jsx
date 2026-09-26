@@ -264,8 +264,8 @@ export default function Settings() {
 
                 <div className="flex items-center justify-between bg-surface-elevated px-4 py-3.5 rounded-xl border border-white/5">
                   <div>
-                    <h4 className="text-xs font-bold text-white">Cashfree Invoice Mails</h4>
-                    <p className="text-[10px] text-white/40 mt-0.5">Receive confirmations for credit checkouts</p>
+                    <h4 className="text-xs font-bold text-white">UPI Payment Confirmations</h4>
+                    <p className="text-[10px] text-white/40 mt-0.5">Receive confirmations for credit package top-ups</p>
                   </div>
                   <input
                     type="checkbox"

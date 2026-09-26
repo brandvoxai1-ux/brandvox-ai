@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useGeneration } from '../hooks/useGeneration';
 import { useAuth } from '../hooks/useAuth';
 import VideoCard from '../components/shared/VideoCard';
+import MediaModal from '../components/shared/MediaModal';
 import Topbar from '../components/layout/Topbar';
 import { Grid, List, Search, SlidersHorizontal, Film, AlertTriangle, RefreshCw, Play } from 'lucide-react';
 import { formatDate, formatCredits } from '../lib/utils';
@@ -21,6 +22,7 @@ export default function Projects() {
   const [videos, setVideos] = useState([]);
   const [watermarkRequired, setWatermarkRequired] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [selectedMedia, setSelectedMedia] = useState(null);
   
   // Controls
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -213,6 +215,7 @@ export default function Projects() {
                   key={video.id}
                   video={video}
                   watermarkRequired={watermarkRequired}
+                  onPlay={(vid) => setSelectedMedia(vid)}
                   onDelete={handleVideoDelete}
                   onToggleShare={handleShareState}
                   onRename={handleTitleRename}
@@ -247,7 +250,11 @@ export default function Projects() {
                 </thead>
                 <tbody className="font-semibold text-white/80 divide-y divide-white/5">
                   {filteredVideos.map((video) => (
-                    <tr key={video.id} className="hover:bg-white/5 transition-colors">
+                    <tr
+                      key={video.id}
+                      onClick={() => video.status === 'completed' && setSelectedMedia(video)}
+                      className={`transition-colors ${video.status === 'completed' ? 'hover:bg-white/5 cursor-pointer' : ''}`}
+                    >
                       <td className="p-4">
                         <div className="w-16 aspect-video bg-black rounded-lg overflow-hidden border border-white/5 relative">
                           <Play className="w-3.5 h-3.5 text-white/50 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
@@ -273,6 +280,14 @@ export default function Projects() {
           </div>
         )}
       </div>
+
+      {/* Full-view playback & media modal */}
+      <MediaModal
+        isOpen={Boolean(selectedMedia)}
+        onClose={() => setSelectedMedia(null)}
+        media={selectedMedia}
+        watermarkRequired={watermarkRequired}
+      />
     </div>
   );
 }

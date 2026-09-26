@@ -1,5 +1,4 @@
-// client/src/App.jsx
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuthContext } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
@@ -8,23 +7,35 @@ import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/layout/AppLayout';
 import AdminLayout from './components/layout/AdminLayout';
 
-// User Pages
+// Public Pages (Eagerly loaded for instant first paint)
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
-import Studio from './pages/Studio';
-import Projects from './pages/Projects';
-import Templates from './pages/Templates';
-import Explore from './pages/Explore';
-import Credits from './pages/Credits';
-import Settings from './pages/Settings';
 
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsers from './pages/admin/AdminUsers';
-import AdminGenerations from './pages/admin/AdminGenerations';
-import AdminModels from './pages/admin/AdminModels';
-import AdminCredits from './pages/admin/AdminCredits';
-import AdminSettings from './pages/admin/AdminSettings';
+// Lazy-loaded User Pages (Code-split)
+const Studio = lazy(() => import('./pages/Studio'));
+const Projects = lazy(() => import('./pages/Projects'));
+const Templates = lazy(() => import('./pages/Templates'));
+const Explore = lazy(() => import('./pages/Explore'));
+const Credits = lazy(() => import('./pages/Credits'));
+const Settings = lazy(() => import('./pages/Settings'));
+
+// Lazy-loaded Admin Pages (Code-split to isolate Recharts & Admin bundles)
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
+const AdminGenerations = lazy(() => import('./pages/admin/AdminGenerations'));
+const AdminModels = lazy(() => import('./pages/admin/AdminModels'));
+const AdminCredits = lazy(() => import('./pages/admin/AdminCredits'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+
+/**
+ * Universal BrandVox page suspension loader
+ */
+const PageLoader = () => (
+  <div className="min-h-screen bg-[#0F0F0F] flex flex-col items-center justify-center text-xs font-black uppercase text-white/40 tracking-widest select-none">
+    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3 shadow-glow" />
+    <span>Loading BrandVox...</span>
+  </div>
+);
 
 /**
  * Route protector checking for active user sessions
@@ -79,30 +90,32 @@ export default function App() {
   return (
     <AuthProvider>
       <Router>
-        <Routes>
-          {/* Public Views */}
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<Auth />} />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Public Views */}
+            <Route path="/" element={<Landing />} />
+            <Route path="/auth" element={<Auth />} />
 
-          {/* User Protected Views */}
-          <Route path="/studio" element={<ProtectedRoute><Studio /></ProtectedRoute>} />
-          <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
-          <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
-          <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
-          <Route path="/credits" element={<ProtectedRoute><Credits /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            {/* User Protected Views */}
+            <Route path="/studio" element={<ProtectedRoute><Studio /></ProtectedRoute>} />
+            <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+            <Route path="/templates" element={<ProtectedRoute><Templates /></ProtectedRoute>} />
+            <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
+            <Route path="/credits" element={<ProtectedRoute><Credits /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
-          {/* Administrative Protected Views */}
-          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-          <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
-          <Route path="/admin/generations" element={<AdminRoute><AdminGenerations /></AdminRoute>} />
-          <Route path="/admin/models" element={<AdminRoute><AdminModels /></AdminRoute>} />
-          <Route path="/admin/credits" element={<AdminRoute><AdminCredits /></AdminRoute>} />
-          <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
+            {/* Administrative Protected Views */}
+            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+            <Route path="/admin/generations" element={<AdminRoute><AdminGenerations /></AdminRoute>} />
+            <Route path="/admin/models" element={<AdminRoute><AdminModels /></AdminRoute>} />
+            <Route path="/admin/credits" element={<AdminRoute><AdminCredits /></AdminRoute>} />
+            <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
 
-          {/* Redirections default fallbacks */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* Redirections default fallbacks */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </Router>
 
       {/* Styled React Hot Toasts indicator notifications */}

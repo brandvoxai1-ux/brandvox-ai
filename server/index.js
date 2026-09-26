@@ -121,6 +121,23 @@ if (!process.env.NETLIFY && !process.env.AWS_LAMBDA_FUNCTION_VERSION && !process
     console.log(` Port:         ${PORT}`);
     console.log(` Target Client: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     console.log('==================================================');
+
+    // Self-ping keepalive to prevent Render free tier from idling out (sleeps after 15m of inactivity)
+    if (process.env.RENDER || process.env.KEEP_ALIVE_URL) {
+      const keepAliveUrl = process.env.KEEP_ALIVE_URL || 'https://brandvox-backend.onrender.com/api/health';
+      const KEEP_ALIVE_INTERVAL = 13 * 60 * 1000; // 13 minutes
+      setInterval(() => {
+        try {
+          const client = keepAliveUrl.startsWith('https') ? require('https') : require('http');
+          client.get(keepAliveUrl, (res) => {
+            res.resume();
+          }).on('error', (err) => {
+            console.log('[KeepAlive] Ping failed (non-critical):', err.message);
+          });
+        } catch (_) {}
+      }, KEEP_ALIVE_INTERVAL);
+      console.log(`[KeepAlive] Scheduled self-ping every 13m to keep backend warm.`);
+    }
   });
 }
 

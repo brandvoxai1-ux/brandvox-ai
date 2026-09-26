@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Topbar from '../components/layout/Topbar';
 import VideoCard from '../components/shared/VideoCard';
+import MediaModal from '../components/shared/MediaModal';
 import { supabase } from '../lib/supabase';
 import { useModels } from '../hooks/useModels';
 import { Search, Compass, Cpu, Film, RefreshCw } from 'lucide-react';
@@ -13,6 +14,7 @@ export default function Explore() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedModel, setSelectedModel] = useState('all');
+  const [selectedMedia, setSelectedMedia] = useState(null);
 
   const fetchPublicVideos = async () => {
     setLoading(true);
@@ -117,13 +119,22 @@ export default function Explore() {
               <VideoCard
                 key={video.id}
                 video={video}
-                watermarkRequired={false} // Explore displays only public completed items, which are watermark-free or pre-compiled. In this design, community videos render watermark-free.
-                showActions={false} // Guest viewing removes modifications
+                watermarkRequired={false}
+                onPlay={(vid) => setSelectedMedia(vid)}
+                showActions={false}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Community Gallery Playback / Inspection Modal */}
+      <MediaModal
+        isOpen={Boolean(selectedMedia)}
+        onClose={() => setSelectedMedia(null)}
+        media={selectedMedia}
+        watermarkRequired={false}
+      />
     </div>
   );
 }
