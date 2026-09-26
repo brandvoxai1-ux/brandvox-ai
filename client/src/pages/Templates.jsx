@@ -114,6 +114,7 @@ export default function Templates() {
               {[
                 { id: 'all', label: 'All' },
                 { id: 'video', label: 'Videos' },
+                { id: 'swap', label: 'V2V Swap' },
                 { id: 'image', label: 'Images' }
               ].map(({ id, label }) => (
                 <button
