@@ -62,6 +62,9 @@ create table public.generations (
   fal_request_id text,
   error_message text,
   is_public boolean default false,
+  generation_type text default 'video' check (generation_type in ('video', 'image', 'swap')),
+  source_video_url text,
+  input_image_url text,
   created_at timestamp with time zone default now()
 );
 
