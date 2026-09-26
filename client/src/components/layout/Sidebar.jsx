@@ -65,7 +65,7 @@ export default function Sidebar({ toggleNotifications }) {
 
   const menuItems = [
     { id: 'studio', path: '/studio', label: 'Studio', icon: Film },
-    { id: 'projects', path: '/projects', label: 'My Videos', icon: FolderOpen },
+    { id: 'projects', path: '/projects', label: 'My Creations', icon: FolderOpen },
     { id: 'templates', path: '/templates', label: 'Templates', icon: LayoutTemplate },
     { id: 'explore', path: '/explore', label: 'Explore', icon: Compass },
     { id: 'credits', path: '/credits', label: 'Credits', icon: Coins },
@@ -144,7 +144,7 @@ export default function Sidebar({ toggleNotifications }) {
                 )}
                 
                 {/* Tooltip Overlay */}
-                <span className="absolute left-16 scale-0 group-hover:scale-100 bg-surface-elevated text-xs text-white px-2 py-1 rounded-md border border-white/5 tracking-wider transition-all duration-150 origin-left z-50">
+                <span className="absolute left-16 scale-0 group-hover:scale-100 bg-surface-elevated text-xs text-white px-2.5 py-1 rounded-md border border-white/5 tracking-wider transition-all duration-150 origin-left z-50 whitespace-nowrap shadow-lg">
                   {item.label}
                 </span>
               </button>

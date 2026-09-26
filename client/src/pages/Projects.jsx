@@ -123,7 +123,7 @@ export default function Projects() {
   return (
     <div className="flex flex-col flex-grow h-full bg-darkBg text-white overflow-hidden">
       {/* Top navbar controls */}
-      <Topbar title="My Library" />
+      <Topbar title="My Creations" />
 
       {/* Main panel scroll container */}
       <div className="flex-grow overflow-y-auto p-6 md:p-8 space-y-6">
@@ -135,7 +135,7 @@ export default function Projects() {
             <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 transform -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search video name or prompt keyword..."
+              placeholder="Search creation name or prompt keyword..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-surface-elevated text-xs rounded-lg px-9 py-2.5 border border-white/10 w-full focus:outline-none focus:border-primary text-white/80"
@@ -203,7 +203,7 @@ export default function Projects() {
             </div>
             <h3 className="text-sm font-bold text-white tracking-wide">No creations found</h3>
             <p className="text-xs text-white/50 max-w-xs leading-relaxed font-semibold">
-              You haven't generated any videos matching your select criteria. Go to the Studio to begin.
+              You haven't generated any creations matching your select criteria. Go to the Studio to begin.
             </p>
           </div>
         ) : viewMode === 'grid' ? (
@@ -227,7 +227,7 @@ export default function Projects() {
             {currentPage < totalPages && (
               <div className="flex justify-center select-none pt-4">
                 <Button variant="secondary" onClick={handleLoadMore} isLoading={loadingMore} className="font-bold text-xs py-2">
-                  Load More Videos
+                  Load More Creations
                 </Button>
               </div>
             )}
