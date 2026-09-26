@@ -21,6 +21,8 @@ const REPLICATE_MODEL_MAP = {
   'fal-ai/flux/dev': 'black-forest-labs/flux-dev',
   'nano-banana': 'black-forest-labs/flux-schnell',
   'chatgpt-image': 'ideogram-ai/ideogram-v2',
+  'chatgpt-image-2': 'ideogram-ai/ideogram-v2',
+  'nano-banana-2': 'black-forest-labs/flux-dev',
   'p-image-ideogram': 'black-forest-labs/flux-schnell',
   'flux-schnell': 'black-forest-labs/flux-schnell',
   'flux-dev': 'black-forest-labs/flux-dev',
@@ -29,11 +31,14 @@ const REPLICATE_MODEL_MAP = {
   // SOTA Video Models (2025/2026)
   'fal-ai/minimax/video-01': 'minimax/video-01',
   'minimax-hailuo': 'minimax/video-01',
+  'google-veo-3': 'minimax/video-01',
   'fal-ai/kling-video/v1.6/standard/text-to-video': 'kuaishou/kling-v1',
   'kling-video-1-6': 'kuaishou/kling-v1',
+  'kling-3-omni': 'kuaishou/kling-v1',
   'fal-ai/wan/v2.5/text-to-video': 'wan-video/wan-2.1-1.3b',
   'wan-2-5-fast': 'wan-video/wan-2.1-1.3b',
   'wan-2-1-14b': 'wan-video/wan-2.1-14b',
+  'wan-3': 'wan-video/wan-2.1-14b',
   'fal-ai/hunyuan-video': 'wan-video/wan-2.1-1.3b',
   'seedance-2-0-fast': 'wan-video/wan-2.1-1.3b',
   'seedance-2-fast': 'wan-video/wan-2.1-1.3b',
@@ -112,14 +117,16 @@ function getDimensions(aspectRatio) {
 }
 
 /**
- * Generates an image via Replicate (defaulting to prunaai/p-image-ideogram)
+ * Generates an image via Replicate (FLUX / Ideogram v2)
+ * Supports text-to-image and image-to-image remixing
  * @param {Object} params
- * @param {string} params.endpoint   - Model identifier or fal alias
- * @param {string} params.prompt     - Text prompt
+ * @param {string} params.endpoint     - Model identifier or alias
+ * @param {string} params.prompt       - Text prompt
  * @param {string} params.aspect_ratio - Aspect ratio string ('1:1', '16:9', etc.)
+ * @param {string} [params.input_image]- Optional input image URL for I2I remix
  * @returns {Promise<{ image_url: string, width: number, height: number, seed: null }>}
  */
-async function generateImage({ endpoint, prompt, aspect_ratio = '1:1' }) {
+async function generateImage({ endpoint, prompt, aspect_ratio = '1:1', input_image = null }) {
   const model = resolveReplicateModel(endpoint, 'black-forest-labs/flux-schnell');
   const dims = getDimensions(aspect_ratio);
 
@@ -131,6 +138,9 @@ async function generateImage({ endpoint, prompt, aspect_ratio = '1:1' }) {
       output_format: 'jpg',
       output_quality: 90
     };
+    if (input_image) {
+      input.image_url = input_image;
+    }
   } else {
     // FLUX.1 Schnell / Dev
     input = {
@@ -139,6 +149,10 @@ async function generateImage({ endpoint, prompt, aspect_ratio = '1:1' }) {
       output_format: 'webp',
       output_quality: 90
     };
+    if (input_image) {
+      input.image = input_image;
+      input.prompt_strength = 0.8;
+    }
   }
 
   try {
@@ -163,6 +177,84 @@ async function generateImage({ endpoint, prompt, aspect_ratio = '1:1' }) {
   } catch (error) {
     console.error('[replicateService] Image generation failed:', error);
     throw new Error(error.message || 'Image API request to Replicate failed');
+  }
+}
+
+/**
+ * Character Replacement / Video-to-Video Motion Transfer Generation
+ * Takes a source motion video + target character reference image/prompt
+ * @param {Object} params
+ * @param {string} [params.endpoint]
+ * @param {string} params.source_video
+ * @param {string} [params.target_character]
+ * @param {string} [params.prompt]
+ * @param {string} [params.aspect_ratio]
+ * @param {string} [params.webhookUrl]
+ * @param {string} [params.generationId]
+ */
+async function generateCharacterSwapVideo({
+  endpoint = 'wan-3',
+  source_video,
+  target_character,
+  prompt,
+  aspect_ratio = '16:9',
+  webhookUrl,
+  generationId
+}) {
+  const model = resolveReplicateModel(endpoint, 'wan-video/wan-2.1-14b');
+  
+  const swapPrompt = prompt && prompt.trim()
+    ? `${prompt}, exact motion transfer, cinematic character swap, ultra-photorealistic, high consistency with source choreography, 8k render`
+    : 'Cinematic character replacement, exact motion transfer, photorealistic, preserving original video motion and dynamic choreography';
+
+  const input = {
+    prompt: swapPrompt,
+    aspect_ratio: aspect_ratio || '16:9'
+  };
+
+  if (source_video) {
+    input.video = source_video;
+  }
+  if (target_character) {
+    if (model.includes('minimax')) {
+      input.first_frame_image = target_character;
+    } else if (model.includes('kling')) {
+      input.start_image = target_character;
+    } else {
+      input.image = target_character;
+    }
+  }
+
+  try {
+    console.log(`[replicateService] Generating Character Swap V2V video via Replicate: ${model}`);
+    console.log(`[replicateService] Source Video: ${source_video}`);
+    console.log(`[replicateService] Target Character: ${target_character}`);
+
+    if (webhookUrl && !webhookUrl.includes('localhost') && !webhookUrl.includes('127.0.0.1')) {
+      const prediction = await replicate.predictions.create({
+        model,
+        input,
+        webhook: `${webhookUrl}?generationId=${generationId}`,
+        webhook_events_filter: ['completed']
+      });
+
+      console.log(`[replicateService] Created V2V prediction queue ID: ${prediction.id}`);
+      return { request_id: prediction.id };
+    } else {
+      console.log(`[replicateService] Running V2V prediction synchronously for: ${model}`);
+      const output = await replicate.run(model, { input });
+      const videoUrl = extractMediaUrl(output);
+
+      if (!videoUrl) {
+        throw new Error('Replicate did not return a valid video URL for character swap.');
+      }
+
+      console.log(`[replicateService] Character swap video generated successfully: ${videoUrl}`);
+      return { video_url: videoUrl };
+    }
+  } catch (error) {
+    console.error('[replicateService] Character swap video generation failed:', error);
+    throw new Error(error.message || 'Character replacement API request failed');
   }
 }
 
@@ -243,6 +335,7 @@ async function getPredictionStatus(predictionId) {
 module.exports = {
   generateImage,
   generateVideo,
+  generateCharacterSwapVideo,
   getPredictionStatus,
   extractMediaUrl,
   resolveReplicateModel,

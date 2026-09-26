@@ -267,7 +267,7 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
   req.setTimeout(180000); // 3 minutes timeout to allow diffusion GPU rendering
   res.setTimeout(180000);
 
-  const { prompt, model_id, aspect_ratio = '1:1' } = req.body;
+  const { prompt, model_id, aspect_ratio = '1:1', input_image = null } = req.body;
 
   if (!prompt || prompt.trim().length === 0) {
     return res.status(400).json({ error: 'Please enter a prompt describing your image.' });
@@ -302,7 +302,7 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
       });
     }
 
-    // 3. Map aspect_ratio to fal.ai image_size param
+    // 3. Map aspect_ratio to image_size param
     const sizeMap = { '1:1': 'square_hd', '4:3': 'landscape_4_3', '3:4': 'portrait_4_3', '16:9': 'landscape_16_9', '9:16': 'portrait_16_9' };
     const image_size = sizeMap[aspect_ratio] || 'landscape_4_3';
 
@@ -322,6 +322,7 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
         aspect_ratio,
         cost,
         generation_type: 'image',
+        input_image_url: input_image || null,
         is_public: false
       })
       .select()
@@ -345,7 +346,8 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
       imageResult = await replicateService.generateImage({
         endpoint: model.fal_endpoint,
         prompt,
-        aspect_ratio
+        aspect_ratio,
+        input_image
       });
     } catch (repErr) {
       // Refund on Replicate failure
@@ -397,6 +399,205 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
   } catch (err) {
     console.error('[generate/image] Error:', err);
     res.status(500).json({ error: err.message || 'Image generation failed.' });
+  }
+});
+
+/**
+ * POST /api/generate/swap
+ * Character Replacement / Video-to-Video Motion Transfer Pipeline
+ * Uploads reference source video + target character reference
+ */
+router.post('/swap', authMiddleware, generationLimiter, async (req, res) => {
+  const {
+    source_video_url,
+    target_character_url,
+    prompt,
+    model_id,
+    duration,
+    aspect_ratio
+  } = req.body;
+
+  if (!source_video_url) {
+    return res.status(400).json({ error: 'Source motion video is required for character replacement.' });
+  }
+
+  if (!target_character_url && (!prompt || prompt.trim().length === 0)) {
+    return res.status(400).json({ error: 'Please provide either a target character image or a detailed character prompt.' });
+  }
+
+  const selectedDuration = parseInt(duration) || 10;
+  const targetModelId = model_id || 'wan-3';
+
+  try {
+    // 1. Fetch model configuration
+    let { data: model, error: modelErr } = await supabase
+      .from('models')
+      .select('*')
+      .eq('id', targetModelId)
+      .eq('is_active', true)
+      .single();
+
+    // Fallback if specific model is inactive
+    if (modelErr || !model) {
+      const { data: fallbackModel } = await supabase
+        .from('models')
+        .select('*')
+        .eq('model_type', 'video')
+        .eq('is_active', true)
+        .order('price_per_second', { ascending: true })
+        .limit(1)
+        .single();
+      model = fallbackModel;
+    }
+
+    if (!model) {
+      return res.status(404).json({ error: 'No compatible video engine available for character swap.' });
+    }
+
+    // Cost calculation: duration * price_per_second
+    const pricePerSec = parseFloat(model.price_per_second || 2.5);
+    const estimatedCost = selectedDuration * pricePerSec;
+
+    // 2. Balance check
+    if (req.user.credits < estimatedCost) {
+      return res.status(400).json({
+        error: `Insufficient balance. Estimated cost is ₹${estimatedCost.toFixed(2)}, but you currently have ₹${req.user.credits.toFixed(2)} available.`
+      });
+    }
+
+    // 3. Insert record into generations
+    const displayTitle = prompt && prompt.trim() 
+      ? `Character Swap: ${prompt.slice(0, 25).trim()}...` 
+      : 'Character Replacement Video';
+
+    const { data: generation, error: dbErr } = await supabase
+      .from('generations')
+      .insert({
+        user_id: req.user.id,
+        title: displayTitle,
+        prompt: prompt || 'Character replacement motion transfer',
+        model_id: model.id,
+        model_name: model.name,
+        status: 'pending',
+        duration: selectedDuration,
+        resolution: '720p',
+        aspect_ratio: aspect_ratio || '16:9',
+        cost: estimatedCost,
+        generation_type: 'swap',
+        source_video_url,
+        input_image_url: target_character_url || null,
+        is_public: false
+      })
+      .select()
+      .single();
+
+    if (dbErr || !generation) {
+      throw new Error(`Failed to initialize character swap generation: ${dbErr?.message}`);
+    }
+
+    // 4. Deduct cost immediately
+    await creditService.deductCredits(
+      req.user.id,
+      estimatedCost,
+      `Character Replacement Video: ${model.name} (${selectedDuration}s)`,
+      generation.id
+    );
+
+    // 5. Send early response to client
+    res.status(202).json({
+      success: true,
+      message: 'Character swap generation initiated successfully.',
+      generationId: generation.id,
+      estimatedCost
+    });
+
+    // 6. Background async processing
+    (async () => {
+      try {
+        await supabase
+          .from('generations')
+          .update({ status: 'processing' })
+          .eq('id', generation.id);
+
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+        const host = req.get('host');
+        const webhookUrl = `${protocol}://${host}/api/generate/webhook`;
+
+        const result = await replicateService.generateCharacterSwapVideo({
+          endpoint: model.fal_endpoint,
+          source_video: source_video_url,
+          target_character: target_character_url,
+          prompt,
+          aspect_ratio: aspect_ratio || '16:9',
+          webhookUrl,
+          generationId: generation.id
+        });
+
+        if (result.video_url) {
+          const placeholderThumb = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500';
+          await supabase
+            .from('generations')
+            .update({
+              status: 'completed',
+              video_url: result.video_url,
+              thumbnail_url: placeholderThumb
+            })
+            .eq('id', generation.id);
+
+          await createNotification(
+            req.user.id,
+            'Character Swap Ready! 🎭',
+            `Your character replacement video with "${model.name}" has completed successfully.`,
+            'success'
+          );
+
+          // Archive final output permanently in 'videos' bucket
+          archiveVideo(result.video_url, req.user.id, generation.id)
+            .then(async (permanentVideoUrl) => {
+              if (permanentVideoUrl && permanentVideoUrl !== result.video_url) {
+                await supabase.from('generations').update({ video_url: permanentVideoUrl }).eq('id', generation.id);
+              }
+            })
+            .catch(err => console.warn('[CharacterSwap] Archiving video warning:', err.message));
+        }
+      } catch (err) {
+        console.error(`[CharacterSwap] Generation failed for: ${generation.id}`, err);
+
+        // Refund atomically on failure
+        try {
+          await creditService.addCredits(
+            req.user.id,
+            parseFloat(estimatedCost),
+            `Refund for failed character swap ${generation.id}`,
+            `refund-${generation.id}`,
+            `refund-${generation.id}`,
+            'refund'
+          );
+          console.log(`[CharacterSwap] Successfully refunded ₹${estimatedCost} to user: ${req.user.id}`);
+        } catch (refundErr) {
+          console.error('[CharacterSwap] Refund critical error:', refundErr);
+        }
+
+        await supabase
+          .from('generations')
+          .update({
+            status: 'failed',
+            error_message: err.message || 'Character replacement execution error.'
+          })
+          .eq('id', generation.id);
+
+        await createNotification(
+          req.user.id,
+          'Character Swap Failed ❌',
+          `Unable to complete character replacement: ${err.message || 'API error.'}. Credits refunded.`,
+          'error'
+        );
+      }
+    })();
+
+  } catch (err) {
+    console.error('Express character swap controller error:', err);
+    res.status(500).json({ error: err.message || 'Character swap dispatcher failed.' });
   }
 });
 

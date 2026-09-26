@@ -9,6 +9,7 @@ const generateRouter = require('./routes/generate');
 const creditsRouter = require('./routes/credits');
 const adminRouter = require('./routes/admin');
 const uploadRouter = require('./routes/upload');
+const { initCleanupService } = require('./services/cleanupService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -121,6 +122,13 @@ if (!process.env.NETLIFY && !process.env.AWS_LAMBDA_FUNCTION_VERSION && !process
     console.log(` Port:         ${PORT}`);
     console.log(` Target Client: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     console.log('==================================================');
+
+    // Mount 7-day ephemeral storage cleanup worker
+    try {
+      initCleanupService();
+    } catch (cleanErr) {
+      console.error('[CleanupService] Failed to start cleanup worker:', cleanErr.message);
+    }
 
     // Self-ping keepalive to prevent Render free tier from idling out (sleeps after 15m of inactivity)
     if (process.env.RENDER || process.env.KEEP_ALIVE_URL) {
