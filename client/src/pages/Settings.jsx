@@ -32,9 +32,39 @@ export default function Settings() {
   const [showPassword, setShowPassword] = useState(false);
   const [changingPass, setChangingPass] = useState(false);
 
-  // Notification configurations states
-  const [notifComplete, setNotifComplete] = useState(true);
-  const [notifPurchase, setNotifPurchase] = useState(true);
+  // Notification configurations states (persisted to localStorage)
+  const [notifComplete, setNotifComplete] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bv_notif_complete');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+  const [notifPurchase, setNotifPurchase] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bv_notif_purchase');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleNotifComplete = (checked) => {
+    setNotifComplete(checked);
+    try {
+      localStorage.setItem('bv_notif_complete', JSON.stringify(checked));
+      toast.success('Notification preference saved.');
+    } catch (_) {}
+  };
+
+  const handleToggleNotifPurchase = (checked) => {
+    setNotifPurchase(checked);
+    try {
+      localStorage.setItem('bv_notif_purchase', JSON.stringify(checked));
+      toast.success('Notification preference saved.');
+    } catch (_) {}
+  };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -257,7 +287,7 @@ export default function Settings() {
                   <input
                     type="checkbox"
                     checked={notifComplete}
-                    onChange={(e) => setNotifComplete(e.target.checked)}
+                    onChange={(e) => handleToggleNotifComplete(e.target.checked)}
                     className="w-4.5 h-4.5 accent-primary rounded bg-surface border-white/10"
                   />
                 </div>
@@ -270,7 +300,7 @@ export default function Settings() {
                   <input
                     type="checkbox"
                     checked={notifPurchase}
-                    onChange={(e) => setNotifPurchase(e.target.checked)}
+                    onChange={(e) => handleToggleNotifPurchase(e.target.checked)}
                     className="w-4.5 h-4.5 accent-primary rounded bg-surface border-white/10"
                   />
                 </div>

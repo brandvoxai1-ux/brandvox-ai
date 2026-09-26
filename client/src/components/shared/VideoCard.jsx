@@ -203,10 +203,14 @@ export default function VideoCard({
                       onError={() => setThumbnail(null)}
                     />
                   ) : (
-                    /* Thumbnail still extracting — show subtle loading state */
-                    <div className="w-full h-full bg-gradient-to-br from-surface-elevated to-black/60 flex items-center justify-center">
-                      <div className="w-4 h-4 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
-                    </div>
+                    /* Native hardware-accelerated poster frame at t=0.5s */
+                    <video
+                      src={`${video.video_url}#t=0.5`}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
                   )
                 )
               )}
