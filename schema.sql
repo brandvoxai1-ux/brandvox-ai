@@ -400,4 +400,13 @@ drop policy if exists "Users can delete own uploads" on storage.objects;
 create policy "Users can delete own uploads" on storage.objects
   for delete using (bucket_id = 'uploads' AND auth.role() = 'authenticated');
 
+-- =========================================================================
+-- Performance Composite Indexes (Sub-15ms Database Lookups)
+-- =========================================================================
+create index if not exists idx_generations_user_created on public.generations(user_id, created_at desc);
+create index if not exists idx_generations_public_created on public.generations(is_public, created_at desc);
+create index if not exists idx_generations_status on public.generations(status);
+create index if not exists idx_transactions_user_created on public.transactions(user_id, created_at desc);
+
+
 
