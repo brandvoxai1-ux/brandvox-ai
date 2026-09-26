@@ -281,7 +281,13 @@ export default function VideoCard({
         {/* Info badges footer */}
         <div className="flex items-center justify-between border-t border-white/5 mt-4 pt-3.5 text-[10px] text-white/40 font-semibold uppercase tracking-wider">
           <div className="flex space-x-2">
-            <span>{video.duration}s</span>
+            {video.generation_type === 'swap' ? (
+              <span className="text-primary font-bold">V2V SWAP</span>
+            ) : video.generation_type === 'image' ? (
+              <span className="text-purple-400 font-bold">IMAGE</span>
+            ) : (
+              <span>{video.duration}s</span>
+            )}
             <span>•</span>
             <span>{video.aspect_ratio}</span>
           </div>

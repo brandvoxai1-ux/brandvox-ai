@@ -28,6 +28,7 @@ export default function Projects() {
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'completed' | 'processing' | 'failed'
+  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'video' | 'swap' | 'image'
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest'
 
   // Pagination states
@@ -78,7 +79,11 @@ export default function Projects() {
       const matchesSearch = v.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             v.prompt?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesType = typeFilter === 'all' || 
+        (typeFilter === 'image' ? v.generation_type === 'image' : 
+         typeFilter === 'swap' ? v.generation_type === 'swap' : 
+         (v.generation_type !== 'image' && v.generation_type !== 'swap'));
+      return matchesSearch && matchesStatus && matchesType;
     })
     .sort((a, b) => {
       const timeA = new Date(a.created_at).getTime();
@@ -150,7 +155,7 @@ export default function Projects() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-surface-elevated text-white border border-white/10 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none"
+                className="bg-surface-elevated text-white border border-white/10 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
               >
                 <option value="all">All States</option>
                 <option value="completed">Completed</option>
@@ -158,6 +163,18 @@ export default function Projects() {
                 <option value="failed">Failed</option>
               </select>
             </div>
+
+            {/* Creation Type Filter */}
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="bg-surface-elevated text-white border border-white/10 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
+            >
+              <option value="all">All Types</option>
+              <option value="video">Videos</option>
+              <option value="swap">Character Swaps</option>
+              <option value="image">Images</option>
+            </select>
 
             {/* Sort sorting tool */}
             <select
