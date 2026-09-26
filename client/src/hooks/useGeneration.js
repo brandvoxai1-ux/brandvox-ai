@@ -47,6 +47,18 @@ export function useGeneration() {
     }
   };
 
+  const createSwapGeneration = async (payload) => {
+    setError(null);
+    try {
+      const res = await api.post('/generate/swap', payload, { timeout: 180000 });
+      return res.data; // { success, message, generationId, estimatedCost }
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to dispatch character swap job.';
+      setError(errorMsg);
+      throw new Error(errorMsg);
+    }
+  };
+
 
   const getStatus = async (id) => {
     try {
@@ -84,6 +96,7 @@ export function useGeneration() {
     fetchGenerations,
     createGeneration,
     createImageGeneration,
+    createSwapGeneration,
     getStatus,
     updateGeneration,
     deleteGeneration

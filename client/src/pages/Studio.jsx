@@ -12,6 +12,7 @@ import ModelCard from '../components/shared/ModelCard';
 import VideoCard from '../components/shared/VideoCard';
 import CreditDisplay from '../components/shared/CreditDisplay';
 import ImageUploader from '../components/shared/ImageUploader';
+import VideoUploader from '../components/shared/VideoUploader';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -28,7 +29,10 @@ import {
   FolderOpen,
   Search,
   ChevronRight,
-  Check
+  Check,
+  UserCheck,
+  ShieldCheck,
+  Video as VideoIcon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -40,13 +44,14 @@ export default function Studio() {
   const {
     createGeneration,
     createImageGeneration,
+    createSwapGeneration,
     getStatus,
     deleteGeneration,
     updateGeneration
   } = useGeneration();
 
   // Left panel states
-  const [activeMode, setActiveMode] = useState('video'); // 'video' | 'image'
+  const [activeMode, setActiveMode] = useState('video'); // 'video' | 'swap' | 'image'
   const [selectedModel, setSelectedModel] = useState(null);
   const [resolution, setResolution] = useState('720p');
   const [aspectRatio, setAspectRatio] = useState('16:9');
@@ -54,7 +59,9 @@ export default function Studio() {
   const [modelSearch, setModelSearch] = useState('');
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const modelPickerRef = useRef(null);
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState(''); // Target character image or Image-to-Video source
+  const [sourceVideoUrl, setSourceVideoUrl] = useState(''); // Character Swap source motion video
+  const [remixImageUrl, setRemixImageUrl] = useState(''); // Image-to-Image remix reference photo
 
   // Topbar and Canvas state
   const [projectTitle, setProjectTitle] = useState('My BrandVox Reel');
@@ -168,9 +175,22 @@ export default function Studio() {
   // Auto select model when mode changes if current selected model doesn't match mode
   useEffect(() => {
     if (models.length > 0) {
-      const modeModels = models.filter(m => (activeMode === 'image' ? m.model_type === 'image' : m.model_type !== 'image'));
-      if (modeModels.length > 0 && (!selectedModel || selectedModel.model_type !== (activeMode === 'image' ? 'image' : 'video'))) {
-        setSelectedModel(modeModels[0]);
+      if (activeMode === 'image') {
+        const imageModels = models.filter(m => m.model_type === 'image');
+        if (imageModels.length > 0 && (!selectedModel || selectedModel.model_type !== 'image')) {
+          setSelectedModel(imageModels[0]);
+        }
+      } else {
+        // 'video' or 'swap'
+        const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
+        if (videoModels.length > 0) {
+          if (!selectedModel || selectedModel.model_type === 'image') {
+            const preferred = activeMode === 'swap'
+              ? (videoModels.find(m => m.id === 'wan-3' || m.id === 'kling-3-omni') || videoModels[0])
+              : videoModels[0];
+            setSelectedModel(preferred);
+          }
+        }
       }
     }
   }, [activeMode, models]);
@@ -179,9 +199,9 @@ export default function Studio() {
   const getEstimatedCost = () => {
     if (!selectedModel) return 0;
     if (selectedModel.model_type === 'image') {
-      return parseFloat(selectedModel.base_cost || 5);
+      return parseFloat(selectedModel.base_cost || 8);
     }
-    return duration * parseFloat(selectedModel.price_per_second);
+    return duration * parseFloat(selectedModel.price_per_second || 2.5);
   };
 
   const cost = getEstimatedCost();
@@ -240,6 +260,7 @@ export default function Studio() {
   // Prompt Templates Categories
   const promptTemplates = [
     { label: '🎬 Cinematic', text: 'Cinematic tracking shot of a futuristic cyberpunk cityscape at night, neon reflections in puddles, atmospheric fog, detailed architecture, photorealistic 8k.' },
+    { label: '🎭 Char Swap', text: 'Seamlessly replace the subject with an elegant cyberpunk hero wearing matte black techwear, perfect motion transfer, dynamic lighting, 8k render.' },
     { label: '🌿 Nature', text: 'Epic slow motion drone sweep across lush tropical waterfalls cascading into crystal lagoons, hyperrealistic moss, golden hour lighting.' },
     { label: '🚗 Product', text: 'Dynamic studio zoom on a sleek metallic sports car, smoke effects, high contrast studio lights flashing, slow dramatic pan, 4k.' },
     { label: '🎨 Abstract', text: 'Vibrant fluid simulation of glowing colorful paints swirling inside zero-gravity, cosmic stardust particle elements, slow morph.' }
@@ -247,13 +268,13 @@ export default function Studio() {
 
   // Dispatch Generation job
   const handleGenerate = async () => {
-    if (!promptText.trim()) {
-      toast.error('Prompt description is empty.');
+    if (!selectedModel) {
+      toast.error('No AI Model selected.');
       return;
     }
 
-    if (!selectedModel) {
-      toast.error('No AI Model selected.');
+    if (activeMode !== 'swap' && !promptText.trim()) {
+      toast.error('Prompt description is empty.');
       return;
     }
 
@@ -267,7 +288,49 @@ export default function Studio() {
       return;
     }
 
-    // IMAGE MODE — call synchronous image endpoint
+    // SWAP MODE — Character Replacement / Video-to-Video Motion Transfer
+    if (activeMode === 'swap') {
+      if (!sourceVideoUrl) {
+        toast.error('Source motion video is required for character replacement.');
+        return;
+      }
+
+      if (!imageUrl && !promptText.trim()) {
+        toast.error('Please provide a target character photo or character description prompt.');
+        return;
+      }
+
+      try {
+        setGenerationStatus('pending');
+        setGenerationError('');
+        setActiveCanvasTab('editor');
+
+        const payload = {
+          source_video_url: sourceVideoUrl,
+          target_character_url: imageUrl || null,
+          prompt: promptText,
+          model_id: selectedModel.id,
+          duration: duration,
+          aspect_ratio: aspectRatio
+        };
+
+        const res = await createSwapGeneration(payload);
+        refreshProfile();
+
+        if (res.success && res.generationId) {
+          setActiveGenerationId(res.generationId);
+          toast.loading('Initiating Character Replacement pipeline...', { id: 'gen-dispatch' });
+          setTimeout(() => toast.dismiss('gen-dispatch'), 2000);
+        }
+      } catch (err) {
+        setGenerationStatus('idle');
+        refreshProfile();
+        toast.error(err.message || 'Character swap failed to submit.');
+      }
+      return;
+    }
+
+    // IMAGE MODE — call synchronous image endpoint with optional I2I remix
     if (activeMode === 'image') {
       try {
         setImageGenerating(true);
@@ -276,11 +339,12 @@ export default function Studio() {
         const res = await createImageGeneration({
           prompt: promptText,
           model_id: selectedModel.id,
-          aspect_ratio: aspectRatio
+          aspect_ratio: aspectRatio,
+          input_image: remixImageUrl || null
         });
         if (res.success && res.image_url) {
           setActiveImageUrl(res.image_url);
-          toast.success('Image generated!');
+          toast.success(remixImageUrl ? 'Image remixed successfully!' : 'Image generated!');
         }
       } catch (err) {
         toast.error(err.message || 'Image generation failed.');
@@ -291,7 +355,7 @@ export default function Studio() {
       return;
     }
 
-    // VIDEO MODE
+    // VIDEO MODE (Text-to-Video & Image-to-Video)
     try {
       setGenerationStatus('pending');
       setGenerationError('');
@@ -346,16 +410,17 @@ export default function Studio() {
       {/* PANEL 2: LEFT CONTROL PANEL (220px wide) */}
       <aside className="hidden lg:flex flex-col w-56 bg-surface border-r border-white/5 p-4 overflow-y-auto shrink-0 select-none justify-between space-y-6 relative">
         <div className="space-y-5">
-          {/* Top-level creator mode: Video | Image */}
-          <div className="flex bg-surface-elevated p-0.5 rounded-lg border border-white/5 text-[10px] font-bold uppercase tracking-wider">
+          {/* Top-level creator mode: Video | Swap (V2V) | Image */}
+          <div className="flex bg-surface-elevated p-0.5 rounded-lg border border-white/5 text-[9.5px] font-bold uppercase tracking-wider">
             {[
               { id: 'video', label: 'Video', icon: Film },
+              { id: 'swap', label: 'Swap', icon: UserCheck },
               { id: 'image', label: 'Image', icon: Sparkles }
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => { setActiveMode(id); setImageUrl(''); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md transition-all ${
+                onClick={() => { setActiveMode(id); }}
+                className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md transition-all cursor-pointer ${
                   activeMode === id ? 'bg-primary text-white shadow-xs' : 'text-white/40 hover:text-white/60'
                 }`}
               >
@@ -365,15 +430,15 @@ export default function Studio() {
             ))}
           </div>
 
-          {/* MEDIA UPLOAD — Only in Video mode */}
+          {/* MEDIA UPLOAD — Text/Image-to-Video mode */}
           {activeMode === 'video' && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Media</label>
+                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Media (Optional)</label>
                 {imageUrl && (
                   <button
                     onClick={() => setImageUrl('')}
-                    className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors"
+                    className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
                   >
                     Clear
                   </button>
@@ -386,7 +451,7 @@ export default function Studio() {
                   <img src={imageUrl} alt="Source" className="w-full h-full object-cover" />
                   <button
                     onClick={() => setImageUrl('')}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-error transition-colors"
+                    className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-error transition-colors cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -403,6 +468,95 @@ export default function Studio() {
                   compact
                 />
               )}
+            </div>
+          )}
+
+          {/* CHARACTER SWAP V2V MEDIA SECTION */}
+          {activeMode === 'swap' && (
+            <div className="space-y-3">
+              {/* Step 1: Source Video */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest flex items-center gap-1">
+                    <span className="text-primary font-black">1.</span>
+                    <span>Source Video</span>
+                  </label>
+                  {sourceVideoUrl && (
+                    <button
+                      onClick={() => setSourceVideoUrl('')}
+                      className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <VideoUploader
+                  value={sourceVideoUrl}
+                  onUrlReady={(url) => setSourceVideoUrl(url)}
+                  onClear={() => setSourceVideoUrl('')}
+                  compact
+                />
+              </div>
+
+              {/* Step 2: Target Character */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest flex items-center gap-1">
+                    <span className="text-primary font-black">2.</span>
+                    <span>Target Character</span>
+                  </label>
+                  {imageUrl && (
+                    <button
+                      onClick={() => setImageUrl('')}
+                      className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <ImageUploader
+                  value={imageUrl}
+                  onUrlReady={(url) => setImageUrl(url)}
+                  onClear={() => setImageUrl('')}
+                  compact
+                />
+              </div>
+
+              {/* Ephemeral Storage Retention Badge */}
+              <div className="p-2 rounded-xl bg-emerald-500/8 border border-emerald-500/15 space-y-1">
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[9px] uppercase tracking-wider">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span>7-Day Privacy Retention</span>
+                </div>
+                <p className="text-[8.5px] text-white/40 leading-tight">
+                  Reference videos and images are automatically purged after 7 days. Your final creation stays permanently.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* IMAGE REMIX SECTION */}
+          {activeMode === 'image' && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                  Remix Photo <span className="text-white/20 normal-case">(Optional)</span>
+                </label>
+                {remixImageUrl && (
+                  <button
+                    onClick={() => setRemixImageUrl('')}
+                    className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <ImageUploader
+                value={remixImageUrl}
+                onUrlReady={(url) => setRemixImageUrl(url)}
+                onClear={() => setRemixImageUrl('')}
+                compact
+              />
             </div>
           )}
 
@@ -521,8 +675,8 @@ export default function Studio() {
           <div className="space-y-4 pt-2 border-t border-white/5">
             <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Output settings</label>
             
-            {/* Resolution dropdown (video only) */}
-            {activeMode === 'video' && (
+            {/* Resolution dropdown (video + swap) */}
+            {(activeMode === 'video' || activeMode === 'swap') && (
               <Select
                 label="Resolution"
                 value={resolution}
@@ -535,7 +689,7 @@ export default function Studio() {
               />
             )}
 
-            {/* Aspect dropdown (video + image) */}
+            {/* Aspect dropdown (video + swap + image) */}
             <Select
               label="Aspect Ratio"
               value={aspectRatio}
@@ -547,8 +701,8 @@ export default function Studio() {
               }
             />
 
-            {/* Discrete Duration Selector (video only) */}
-            {activeMode === 'video' && (
+            {/* Discrete Duration Selector (video + swap) */}
+            {(activeMode === 'video' || activeMode === 'swap') && (
               <div className="flex flex-col space-y-1.5">
                 <div className="flex justify-between text-[10px] font-bold text-white/50 tracking-wider">
                   <span>Duration</span>
@@ -561,7 +715,7 @@ export default function Studio() {
                       type="button"
                       disabled={selectedModel?.max_duration && sec > selectedModel.max_duration}
                       onClick={() => setDuration(sec)}
-                      className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         duration === sec
                           ? 'bg-primary text-white shadow-xs'
                           : 'text-white/60 hover:text-white hover:bg-white/5'
@@ -625,15 +779,17 @@ export default function Studio() {
               variant="primary"
               size="md"
               disabled={
-                !promptText.trim() ||
+                (activeMode === 'swap' ? (!sourceVideoUrl || (!imageUrl && !promptText.trim())) : !promptText.trim()) ||
                 insufficientCredits ||
                 (activeMode === 'image' ? imageGenerating : generationStatus !== 'idle')
               }
               onClick={handleGenerate}
-              className="shadow-premium uppercase font-extrabold text-xs tracking-wider"
+              className="shadow-premium uppercase font-extrabold text-xs tracking-wider cursor-pointer"
             >
-              {activeMode === 'image'
-                ? (imageGenerating ? 'Generating Image...' : 'Generate Image')
+              {activeMode === 'swap'
+                ? (generationStatus !== 'idle' ? 'Swapping Character...' : 'Swap Character')
+                : activeMode === 'image'
+                ? (imageGenerating ? 'Generating Image...' : (remixImageUrl ? 'Remix Image' : 'Generate Image'))
                 : (generationStatus !== 'idle' ? 'Generating Video...' : 'Generate Video')
               }
             </Button>
@@ -654,7 +810,9 @@ export default function Studio() {
                     <div className="flex flex-col items-center justify-center p-6 w-full h-full text-center space-y-4">
                       <RefreshCw className="w-8 h-8 text-primary-hover animate-spin" />
                       <div>
-                        <h4 className="text-sm font-bold text-white tracking-wide">Generating High-Detail Image</h4>
+                        <h4 className="text-sm font-bold text-white tracking-wide">
+                          {remixImageUrl ? 'Remixing Image with AI Reference' : 'Generating High-Detail Image'}
+                        </h4>
                         <p className="text-[10.5px] text-white/45 mt-1 font-semibold uppercase tracking-wider">
                           Running {selectedModel?.name} on Replicate GPU...
                         </p>
@@ -683,20 +841,25 @@ export default function Studio() {
                       </div>
                       <h4 className="text-sm font-bold text-white tracking-wide">Image preview canvas</h4>
                       <p className="text-xs text-white/50 max-w-xs leading-relaxed font-semibold">
-                        Describe your vision below and select an image model ({selectedModel?.name || 'Nano Banana'}) to create artwork.
+                        Describe your vision below {remixImageUrl ? 'to remix with your uploaded reference' : `and select an image model (${selectedModel?.name || 'Nano Banana 2.0'}) to create artwork`}.
                       </p>
                     </div>
                   )
                 ) : (
-                  /* VIDEO MODE CANVAS */
+                  /* VIDEO & SWAP MODE CANVAS */
                   generationStatus === 'pending' || generationStatus === 'processing' ? (
                     /* Processing compilation frame */
                     <div className="flex flex-col items-center justify-center p-6 w-full h-full text-center space-y-4">
                       <RefreshCw className="w-8 h-8 text-primary-hover animate-spin" />
                       <div>
-                        <h4 className="text-sm font-bold text-white tracking-wide">Compiling Cinematic Frames</h4>
+                        <h4 className="text-sm font-bold text-white tracking-wide">
+                          {activeMode === 'swap' ? 'Synthesizing Character Motion Transfer' : 'Compiling Cinematic Frames'}
+                        </h4>
                         <p className="text-[10.5px] text-white/45 mt-1 font-semibold uppercase tracking-wider">
-                          Running {selectedModel?.name} pipeline in background...
+                          {activeMode === 'swap' 
+                            ? `Transferring motion onto ${selectedModel?.name || 'Wan 3.0'}...`
+                            : `Running ${selectedModel?.name} pipeline in background...`
+                          }
                         </p>
                       </div>
                       <div className="w-64">
