@@ -1006,7 +1006,13 @@ export default function Studio() {
             <div className="relative">
               <textarea
                 ref={promptRef}
-                placeholder="Describe your scene in rich detail — movements, actions, camera shifts, and moody lighting..."
+                placeholder={
+                  activeMode === 'swap'
+                    ? "Describe desired tweaks (optional) — e.g. Replace character, change outfit, Indian family setting, cinematic lighting..."
+                    : activeMode === 'image'
+                    ? "Describe the image you want to create in rich detail..."
+                    : "Describe your scene in rich detail — movements, actions, camera shifts, and moody lighting..."
+                }
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
                 maxLength="500"

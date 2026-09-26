@@ -1,20 +1,19 @@
 // client/src/components/shared/ImageUploader.jsx
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, X, Image as ImageIcon, Loader2, Link } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import api from '../../lib/api';
 import toast from 'react-hot-toast';
 
 /**
  * ImageUploader
- * Dual-mode: drag-and-drop file upload OR paste a direct URL.
- * On upload success, calls onUrlReady(url) with the permanent public URL.
+ * Pure file dropzone for target character & reference images (JPEG, PNG, WebP, GIF up to 20MB).
+ * Automatically uploads file to ephemeral cloud storage for the AI pipeline.
  */
-export default function ImageUploader({ value, onUrlReady, onClear }) {
-  const [mode, setMode] = useState('upload'); // 'upload' | 'url'
+export default function ImageUploader({ value, onUrlReady, onClear, compact = false }) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(value || null);
-  const [urlInput, setUrlInput] = useState('');
+  const [fileName, setFileName] = useState('');
   const fileInputRef = useRef(null);
 
   const handleFile = useCallback(async (file) => {
@@ -31,7 +30,7 @@ export default function ImageUploader({ value, onUrlReady, onClear }) {
       return;
     }
 
-    // Show local preview immediately
+    setFileName(file.name);
     const localPreview = URL.createObjectURL(file);
     setPreview(localPreview);
     setUploading(true);
@@ -47,9 +46,10 @@ export default function ImageUploader({ value, onUrlReady, onClear }) {
       const permanentUrl = res.data.url;
       setPreview(permanentUrl);
       onUrlReady(permanentUrl);
-      toast.success('Image uploaded successfully!');
+      toast.success('Character image uploaded successfully!');
     } catch (err) {
       setPreview(null);
+      setFileName('');
       toast.error(err?.response?.data?.error || 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
@@ -57,7 +57,6 @@ export default function ImageUploader({ value, onUrlReady, onClear }) {
     }
   }, [onUrlReady]);
 
-  // Drag events
   const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);
   const handleDrop = (e) => {
@@ -72,143 +71,87 @@ export default function ImageUploader({ value, onUrlReady, onClear }) {
     if (file) handleFile(file);
   };
 
-  const handleUrlSubmit = () => {
-    const trimmed = urlInput.trim();
-    if (!trimmed) { toast.error('Please enter an image URL.'); return; }
-    try {
-      new URL(trimmed); // validate
-      setPreview(trimmed);
-      onUrlReady(trimmed);
-      toast.success('Image URL applied.');
-    } catch {
-      toast.error('Please enter a valid URL (starting with https://).');
-    }
-  };
-
   const handleClear = () => {
     setPreview(null);
-    setUrlInput('');
+    setFileName('');
     if (fileInputRef.current) fileInputRef.current.value = '';
     onUrlReady('');
     if (onClear) onClear();
   };
 
-  return (
-    <div className="space-y-3">
-      {/* Mode Tab Switcher */}
-      <div className="flex bg-surface-elevated rounded-lg border border-white/5 p-0.5 text-[10px] font-bold uppercase tracking-wider">
-        <button
-          type="button"
-          onClick={() => setMode('upload')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md transition-all ${
-            mode === 'upload' ? 'bg-primary text-white shadow-sm' : 'text-white/40 hover:text-white/60'
-          }`}
-        >
-          <Upload className="w-3 h-3" />
-          Upload File
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('url')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md transition-all ${
-            mode === 'url' ? 'bg-primary text-white shadow-sm' : 'text-white/40 hover:text-white/60'
-          }`}
-        >
-          <Link className="w-3 h-3" />
-          Paste URL
-        </button>
-      </div>
-
-      {/* Preview (if we have an image) */}
-      {preview && (
-        <div className="relative rounded-xl overflow-hidden border border-white/10 aspect-video w-full bg-black">
-          <img
-            src={preview}
-            alt="Source image preview"
-            className="w-full h-full object-contain"
-            onError={() => { setPreview(null); toast.error('Could not load image from URL.'); }}
-          />
-          {/* Uploading overlay */}
-          {uploading && (
-            <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
-              <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider">Uploading...</span>
-            </div>
-          )}
-          {/* Clear button */}
-          {!uploading && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="absolute top-2 right-2 bg-black/70 hover:bg-red-900/80 text-white/70 hover:text-white p-1 rounded-full transition-all border border-white/10"
-              title="Remove image"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Drop zone (upload mode) */}
-      {!preview && mode === 'upload' && (
-        <>
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`relative flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed cursor-pointer transition-all select-none ${
-              isDragging
-                ? 'border-primary bg-primary/10 scale-[1.01]'
-                : 'border-white/10 hover:border-primary/50 hover:bg-white/3 bg-surface-elevated'
-            }`}
-          >
-            <div className={`p-3 rounded-full mb-3 transition-all ${isDragging ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/30'}`}>
-              {uploading
-                ? <Loader2 className="w-6 h-6 animate-spin" />
-                : <ImageIcon className="w-6 h-6" />
-              }
-            </div>
-            {uploading ? (
-              <p className="text-[10.5px] font-bold text-primary tracking-wide">Uploading to cloud storage...</p>
-            ) : isDragging ? (
-              <p className="text-[10.5px] font-bold text-primary tracking-wide">Drop to upload!</p>
-            ) : (
-              <>
-                <p className="text-[10.5px] font-bold text-white/50 tracking-wide">Drop image here or click to browse</p>
-                <p className="text-[9px] text-white/25 font-semibold mt-1 uppercase tracking-wider">JPEG · PNG · WebP · GIF — Max 20 MB</p>
-              </>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="hidden"
-              onChange={handleInputChange}
-              disabled={uploading}
-            />
+  // Preview Mode — image uploaded
+  if (preview) {
+    return (
+      <div className="relative rounded-xl overflow-hidden border border-white/10 aspect-video w-full bg-black group shadow-lg">
+        <img
+          src={preview}
+          alt="Character preview"
+          className="w-full h-full object-contain"
+        />
+        {uploading && (
+          <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2">
+            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+            <span className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Uploading photo...</span>
           </div>
-        </>
-      )}
-
-      {/* URL input (url mode) */}
-      {!preview && mode === 'url' && (
-        <div className="flex items-center gap-2">
-          <input
-            type="url"
-            placeholder="https://example.com/photo.jpg"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
-            className="flex-1 bg-surface-elevated text-xs rounded-lg px-3 py-2 border border-white/10 focus:outline-none focus:border-primary text-white/80 placeholder-white/20"
-          />
+        )}
+        {!uploading && (
           <button
             type="button"
-            onClick={handleUrlSubmit}
-            className="px-3 py-2 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold uppercase rounded-lg transition-colors shrink-0"
+            onClick={handleClear}
+            className="absolute top-2 right-2 bg-black/80 hover:bg-error text-white p-1 rounded-full transition-colors z-10 cursor-pointer shadow-md"
+            title="Remove image"
           >
-            Apply
+            <X className="w-3.5 h-3.5" />
           </button>
+        )}
+        <div className="absolute bottom-2 left-2 bg-black/80 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-bold text-white/90 uppercase tracking-wider flex items-center gap-1.5">
+          <ImageIcon className="w-3 h-3 text-primary" />
+          <span className="truncate max-w-[150px]">{fileName || 'Target Character'}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Upload Dropzone Mode
+  return (
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onClick={() => !uploading && fileInputRef.current?.click()}
+      className={`relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all select-none ${
+        isDragging
+          ? 'border-primary bg-primary/10 scale-[0.99]'
+          : 'border-white/15 hover:border-primary/50 bg-white/[0.02] hover:bg-white/[0.04]'
+      } ${uploading ? 'pointer-events-none opacity-80' : ''}`}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        onChange={handleInputChange}
+        className="hidden"
+      />
+
+      {uploading ? (
+        <div className="flex flex-col items-center justify-center py-3 space-y-2">
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
+          <p className="text-[11px] font-bold text-white/90">Uploading character image...</p>
+          <p className="text-[9px] text-white/40">Preparing reference photo for swap</p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-2.5 space-y-1.5">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+            <Upload className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-white/90">
+              Choose Character Photo
+            </p>
+            <p className="text-[9px] text-white/40 mt-0.5">
+              Drag & drop or click to browse (PNG, JPG, WebP · max 20MB)
+            </p>
+          </div>
         </div>
       )}
     </div>
