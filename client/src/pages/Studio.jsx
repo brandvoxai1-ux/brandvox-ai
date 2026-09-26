@@ -263,7 +263,7 @@ export default function Studio() {
     }
 
     if (insufficientCredits) {
-      toast.error('Insufficient credits. Purchase more credits.');
+      toast.error(`Insufficient balance. This model costs ₹${cost.toFixed(2)}, but your current balance is ₹${(profile?.credits || 0).toFixed(2)}.`);
       return;
     }
 
@@ -272,6 +272,7 @@ export default function Studio() {
       try {
         setImageGenerating(true);
         setActiveImageUrl(null);
+        refreshProfile(); // Sync balance right after trigger
         const res = await createImageGeneration({
           prompt: promptText,
           model_id: selectedModel.id,
@@ -279,13 +280,13 @@ export default function Studio() {
         });
         if (res.success && res.image_url) {
           setActiveImageUrl(res.image_url);
-          await refreshProfile();
           toast.success('Image generated!');
         }
       } catch (err) {
         toast.error(err.message || 'Image generation failed.');
       } finally {
         setImageGenerating(false);
+        await refreshProfile();
       }
       return;
     }
@@ -307,6 +308,7 @@ export default function Studio() {
       };
 
       const res = await createGeneration(payload);
+      refreshProfile(); // Sync balance right after dispatch
       
       if (res.success && res.generationId) {
         setActiveGenerationId(res.generationId);
@@ -315,6 +317,7 @@ export default function Studio() {
       }
     } catch (err) {
       setGenerationStatus('idle');
+      refreshProfile();
       toast.error(err.message || 'Generation failed to submit.');
     }
   };

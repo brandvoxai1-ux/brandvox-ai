@@ -69,7 +69,7 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
     // 3. Server-side credit check
     if (req.user.credits < estimatedCost) {
       return res.status(400).json({
-        error: `Insufficient balance. Estimated cost is ₹${estimatedCost.toFixed(2)}, but you only have ₹${req.user.credits.toFixed(2)} credits.`
+        error: `Insufficient balance. Estimated cost is ₹${estimatedCost.toFixed(2)}, but you currently have ₹${req.user.credits.toFixed(2)} available.`
       });
     }
 
@@ -298,7 +298,7 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
     // 2. Credit check
     if (req.user.credits < cost) {
       return res.status(400).json({
-        error: `Insufficient balance. This model costs ₹${cost.toFixed(2)} but you have ₹${req.user.credits.toFixed(2)}.`
+        error: `Insufficient balance. This model costs ₹${cost.toFixed(2)}, but you currently have ₹${req.user.credits.toFixed(2)} available.`
       });
     }
 
