@@ -46,13 +46,14 @@ const REPLICATE_MODEL_MAP = {
   'wan-video/wan-2.1': 'wan-video/wan-2.1-1.3b',
   'wan-3': 'wan-video/wan-2.1-1.3b',
   'fal-ai/hunyuan-video': 'wan-video/wan-2.1-1.3b',
-  'seedance-2-0-fast': 'wan-video/wan-2.1-1.3b',
-  'seedance-2-fast': 'wan-video/wan-2.1-1.3b',
-  'seedance-2': 'wan-video/wan-2.1-1.3b',
-  'seedance-2-i2v': 'minimax/video-01',
-  'bytedance/seedance-2.0/fast/text-to-video': 'wan-video/wan-2.1-1.3b',
-  'bytedance/seedance-2.0/text-to-video': 'wan-video/wan-2.1-1.3b',
-  'bytedance/seedance-2.0/image-to-video': 'minimax/video-01'
+  'seedance-2-0-fast': 'bytedance/seedance-2.0',
+  'seedance-2-fast': 'bytedance/seedance-2.0',
+  'seedance-2': 'bytedance/seedance-2.0',
+  'seedance-2-i2v': 'bytedance/seedance-2.0',
+  'bytedance/seedance-2.0/fast/text-to-video': 'bytedance/seedance-2.0',
+  'bytedance/seedance-2.0/text-to-video': 'bytedance/seedance-2.0',
+  'bytedance/seedance-2.0/image-to-video': 'bytedance/seedance-2.0',
+  'bytedance/seedance-2.0': 'bytedance/seedance-2.0'
 };
 
 /**
@@ -212,17 +213,28 @@ async function generateCharacterSwapVideo({
   webhookUrl,
   generationId
 }) {
-  const model = resolveReplicateModel(endpoint, 'kwaivgi/kling-v3-omni-video');
+  const resolved = resolveReplicateModel(endpoint, 'kwaivgi/kling-v3-omni-video');
   
-  const swapPrompt = prompt && prompt.trim()
-    ? `Replace the main subject in <<<video_1>>> with the character in <<<image_1>>>, ${prompt}, exact motion transfer, cinematic character swap, ultra-photorealistic, high consistency with source choreography, 8k render`
-    : 'Replace the main subject in <<<video_1>>> with the character in <<<image_1>>>, exact motion transfer, cinematic character swap, photorealistic, preserving original video motion and dynamic choreography';
+  // Guarantee character swap uses a true V2V motion transfer model
+  const model = resolved.includes('seedance')
+    ? 'bytedance/seedance-2.0'
+    : 'kwaivgi/kling-v3-omni-video';
 
-  const input = {
-    prompt: swapPrompt
-  };
+  const input = {};
 
-  if (model.includes('kling-v3-omni') || model.includes('omni')) {
+  if (model.includes('seedance')) {
+    input.prompt = prompt && prompt.trim()
+      ? `Replace the main character in [Video1] with the subject in [Image1], ${prompt}, seamless motion transfer, cinematic character swap, 8k render, high realism`
+      : 'Replace the main character in [Video1] with the subject in [Image1], seamless motion transfer, preserving original choreography and movement, cinematic 8k';
+    if (source_video) input.reference_videos = [source_video];
+    if (target_character) input.reference_images = [target_character];
+    input.resolution = '720p';
+    input.generate_audio = true;
+  } else {
+    // Kling v3 Omni Director
+    input.prompt = prompt && prompt.trim()
+      ? `Replace the main subject in <<<video_1>>> with the character in <<<image_1>>>, ${prompt}, exact motion transfer, cinematic character swap, ultra-photorealistic, high consistency with source choreography, 8k render`
+      : 'Replace the main subject in <<<video_1>>> with the character in <<<image_1>>>, exact motion transfer, cinematic character swap, photorealistic, preserving original video motion and dynamic choreography';
     if (source_video) {
       input.reference_video = source_video;
       input.video_reference_type = 'base';
@@ -230,22 +242,8 @@ async function generateCharacterSwapVideo({
     }
     if (target_character) {
       input.reference_images = [target_character];
-      // Note: Kling Omni in video editing ('base') mode strictly prohibits start_image/end_image (Error 1201).
-      // The character is correctly provided via reference_images and mapped to <<<image_1>>>.
     }
     input.mode = 'pro';
-  } else if (model.includes('minimax')) {
-    input.aspect_ratio = aspect_ratio || '16:9';
-    if (target_character) input.first_frame_image = target_character;
-    if (source_video) input.video = source_video;
-  } else if (model.includes('kling')) {
-    input.aspect_ratio = aspect_ratio || '16:9';
-    if (target_character) input.start_image = target_character;
-    if (source_video) input.video = source_video;
-  } else {
-    input.aspect_ratio = aspect_ratio || '16:9';
-    if (target_character) input.image = target_character;
-    if (source_video) input.video = source_video;
   }
 
   try {
@@ -291,15 +289,24 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
 
   const input = { prompt };
 
-  if (model.includes('minimax')) {
+  if (model.includes('seedance')) {
+    input.resolution = resolution || '720p';
+    input.aspect_ratio = aspect_ratio || '16:9';
+    if (duration) {
+      const parsedDur = parseInt(duration, 10);
+      if (!isNaN(parsedDur)) {
+        input.duration = Math.max(3, Math.min(15, parsedDur));
+      }
+    }
+    input.generate_audio = generate_audio !== false;
+    if (image_url) input.image = image_url;
+  } else if (model.includes('minimax')) {
     input.prompt_optimizer = true;
     if (image_url) input.first_frame_image = image_url;
   } else if (model.includes('wan')) {
-    // Wan 2.1 SOTA accepts aspect_ratio ('16:9', '9:16', '1:1')
+    // Wan 2.1 1.3b on Replicate strictly allows ONLY "480p"
     input.aspect_ratio = aspect_ratio || '16:9';
-    if (resolution === '720p' || resolution === '480p') {
-      input.resolution = resolution;
-    }
+    input.resolution = '480p';
   } else if (model.includes('kling')) {
     input.aspect_ratio = aspect_ratio || '16:9';
     if (duration) {
@@ -312,9 +319,10 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
     input.generate_audio = generate_audio !== false;
     if (resolution === '1080p') {
       input.mode = 'pro';
-    } else if (resolution === '720p') {
+    } else {
       input.mode = 'standard';
     }
+    input.negative_prompt = 'blurry, low quality, distorted, deformed faces, bad anatomy, amateur, jittery, watermark, oversaturated';
   } else {
     if (image_url) input.first_frame_image = image_url;
   }

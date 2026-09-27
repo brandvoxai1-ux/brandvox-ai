@@ -1,6 +1,7 @@
 // client/src/components/shared/MediaModal.jsx
 import React, { useEffect } from 'react';
-import { X, Download, Copy, Sparkles, Crown, Film, Image as ImageIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, Download, Copy, Sparkles, Crown, Film, Image as ImageIcon, Wand2 } from 'lucide-react';
 import { formatDate, formatCredits } from '../../lib/utils';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -12,6 +13,7 @@ export default function MediaModal({
   media,
   watermarkRequired = false
 }) {
+  const navigate = useNavigate();
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -64,6 +66,20 @@ export default function MediaModal({
     toast.success('Prompt copied to clipboard!');
   };
 
+  const handleRemix = () => {
+    onClose();
+    navigate('/studio', {
+      state: {
+        prompt: media.prompt || '',
+        title: media.title ? `Remix: ${media.title}` : 'Remix Creation',
+        model: media.model_name || 'kling-3-omni',
+        aspectRatio: media.aspect_ratio || '16:9',
+        duration: media.duration ? String(media.duration) : '5'
+      }
+    });
+    toast.success('Loaded creation into Studio for remixing!');
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/85 backdrop-blur-md animate-fade-in"
@@ -90,6 +106,16 @@ export default function MediaModal({
           </div>
 
           <div className="flex items-center space-x-2 shrink-0">
+            {media.prompt && (
+              <button
+                onClick={handleRemix}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10"
+                title="Open in Studio to generate variations"
+              >
+                <Wand2 className="w-3.5 h-3.5 text-primary" />
+                <span>Remix in Studio</span>
+              </button>
+            )}
             <button
               onClick={handleDownload}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all shadow-premium"

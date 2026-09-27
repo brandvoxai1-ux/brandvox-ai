@@ -69,6 +69,10 @@ export default function Studio() {
   const [sourceVideoUrl, setSourceVideoUrl] = useState(''); // Character Swap source motion video
   const [remixImageUrl, setRemixImageUrl] = useState(''); // Image-to-Image remix reference photo
 
+  // AI Prompt Enhancer state
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [adStyle, setAdStyle] = useState('ad-commercial');
+
   // Topbar and Canvas state
   const [projectTitle, setProjectTitle] = useState('My BrandVox Reel');
   const [activeCanvasTab, setActiveCanvasTab] = useState('editor'); // 'editor' | 'queue' | 'history'
@@ -88,19 +92,29 @@ export default function Studio() {
   const [promptText, setPromptText] = useState('');
   const promptRef = useRef(null);
 
-  // Handle incoming template preloading from /templates
+  // Handle incoming template or remix data from Navigation (Templates or Explore pages)
   useEffect(() => {
     if (location.state?.template) {
-      const t = location.state.template;
-      if (t.prompt) setPromptText(t.prompt);
-      if (t.aspect_ratio) setAspectRatio(t.aspect_ratio);
-      if (t.duration) setDuration(t.duration);
-      if (t.media_type) setActiveMode(t.media_type);
-      if (t.model_id && models.length > 0) {
-        const found = models.find(m => m.id === t.model_id || m.fal_endpoint === t.model_id);
+      const tpl = location.state.template;
+      if (tpl.prompt) setPromptText(tpl.prompt);
+      if (tpl.title) setProjectTitle(tpl.title);
+      if (tpl.aspect_ratio) setAspectRatio(tpl.aspect_ratio);
+      if (tpl.duration) setDuration(tpl.duration);
+      if (tpl.media_type) setActiveMode(tpl.media_type);
+      if (tpl.model_id && models.length > 0) {
+        const found = models.find(m => m.id === tpl.model_id || m.fal_endpoint === tpl.model_id);
         if (found) setSelectedModel(found);
       }
-      toast.success(`✨ Loaded template: "${t.title || 'Creative Preset'}"`);
+      toast.success(`✨ Loaded template: "${tpl.title || 'Creative Preset'}"`);
+      window.history.replaceState({}, document.title);
+    } else if (location.state?.remixPrompt) {
+      setPromptText(location.state.remixPrompt);
+      if (location.state.model_id && models.length > 0) {
+        const found = models.find(m => m.id === location.state.model_id);
+        if (found) setSelectedModel(found);
+      }
+      if (location.state.media_type) setActiveMode(location.state.media_type);
+      toast.success('Prompt loaded into Studio!', { icon: '🎨' });
       window.history.replaceState({}, document.title);
     }
   }, [location.state, models]);
@@ -285,15 +299,18 @@ export default function Studio() {
         if (imageModels.length > 0 && (!selectedModel || selectedModel.model_type !== 'image')) {
           setSelectedModel(imageModels[0]);
         }
+      } else if (activeMode === 'swap') {
+        const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
+        const swapModel = videoModels.find(m => m.id === 'kling-3-omni') || videoModels.find(m => m.id === 'seedance-2') || videoModels[0];
+        if (!selectedModel || !['kling-3-omni', 'seedance-2'].includes(selectedModel.id)) {
+          setSelectedModel(swapModel);
+        }
       } else {
-        // 'video' or 'swap'
+        // 'video'
         const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
         if (videoModels.length > 0) {
           if (!selectedModel || selectedModel.model_type === 'image') {
-            const preferred = activeMode === 'swap'
-              ? (videoModels.find(m => m.id === 'wan-3' || m.id === 'kling-3-omni') || videoModels[0])
-              : videoModels[0];
-            setSelectedModel(preferred);
+            setSelectedModel(videoModels[0]);
           }
         }
       }
@@ -397,6 +414,38 @@ export default function Studio() {
     { label: '🚗 Product', text: 'Dynamic studio zoom on a sleek metallic sports car, smoke effects, high contrast studio lights flashing, slow dramatic pan, 4k.' },
     { label: '🎨 Abstract', text: 'Vibrant fluid simulation of glowing colorful paints swirling inside zero-gravity, cosmic stardust particle elements, slow morph.' }
   ];
+
+  // Commercial Ad Creative Styles for AI Enhancer
+  const adCreativeStyles = [
+    { id: 'ad-commercial', label: '✨ Brand Commercial' },
+    { id: 'viral-reels', label: '📱 Viral TikTok / Reel' },
+    { id: 'cinematic', label: '🎬 Hollywood Cinema' },
+    { id: 'product-showcase', label: '🛍️ 3D Kinetic Product' }
+  ];
+
+  const handleEnhancePrompt = async () => {
+    if (!promptText.trim()) {
+      toast.error('Type a brief prompt idea first to enhance it into a commercial ad.');
+      return;
+    }
+    setIsEnhancing(true);
+    const toastId = toast.loading('Engineering cinematic commercial prompt...');
+    try {
+      const res = await api.post('/generate/enhance-prompt', {
+        prompt: promptText,
+        style: adStyle,
+        mode: activeMode
+      });
+      if (res.data?.enhancedPrompt) {
+        setPromptText(res.data.enhancedPrompt);
+        toast.success('🪄 Prompt enhanced for high-converting cinematic ad!', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Prompt enhancement failed. Try again.', { id: toastId });
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
 
   // Dispatch Generation job
   const handleGenerate = async () => {
@@ -751,12 +800,16 @@ export default function Studio() {
                 <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
                   <Sparkles className="w-2.5 h-2.5 text-primary/50" />
                   <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">
-                    {activeMode === 'image' ? 'Image Models' : 'Video Models'}
+                    {activeMode === 'image' ? 'Image Models' : activeMode === 'swap' ? 'Character Swap Motion Models' : 'Video Models'}
                   </span>
                 </div>
                 <div className="pb-2 max-h-60 overflow-y-auto">
                   {models
-                    .filter(m => (activeMode === 'image' ? m.model_type === 'image' : (m.model_type || 'video') !== 'image'))
+                    .filter(m => {
+                      if (activeMode === 'image') return m.model_type === 'image';
+                      if (activeMode === 'swap') return m.id === 'kling-3-omni' || m.id === 'seedance-2';
+                      return (m.model_type || 'video') !== 'image';
+                    })
                     .filter(m => !modelSearch || m.name.toLowerCase().includes(modelSearch.toLowerCase()))
                     .map((model) => {
                       const isSelected = selectedModel?.id === model.id;
@@ -1182,20 +1235,46 @@ export default function Studio() {
           </div>
 
           {/* Core Prompt input tray (always visible on Panel 3 bottom) */}
-          <div className="w-full max-w-2xl mx-auto space-y-3.5 bg-surface border border-white/5 p-4 rounded-2xl select-none shadow-premium">
+          <div className="w-full max-w-2xl mx-auto space-y-3 bg-surface border border-white/5 p-4 rounded-2xl select-none shadow-premium">
             
-            {/* Quick Templates Categories */}
-            <div className="flex items-center space-x-2 overflow-x-auto pr-1 pb-1">
-              <span className="text-[9px] font-black uppercase text-white/35 tracking-wider shrink-0">Tips:</span>
-              {promptTemplates.map((t, i) => (
-                <button
-                  key={i}
-                  onClick={() => setPromptText(t.text)}
-                  className="px-2.5 py-1 bg-white/5 hover:bg-primary hover:text-white rounded-md text-[10px] font-bold text-white/60 transition-colors shrink-0 cursor-pointer border border-white/5"
-                >
-                  {t.label}
-                </button>
-              ))}
+            {/* Quick Templates & Ad Styles Toolbar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+              <div className="flex items-center space-x-1.5 overflow-x-auto pr-1">
+                <span className="text-[9px] font-black uppercase text-primary-hover tracking-wider shrink-0 mr-1 flex items-center">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Ad Style:
+                </span>
+                {adCreativeStyles.map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => setAdStyle(style.id)}
+                    className={`px-2 py-0.5 rounded-md text-[9.5px] font-bold transition-all shrink-0 cursor-pointer border ${
+                      adStyle === style.id
+                        ? 'bg-primary text-white border-primary shadow-xs'
+                        : 'bg-white/5 text-white/60 hover:text-white border-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Enhance Button */}
+              <button
+                type="button"
+                disabled={isEnhancing || !promptText.trim()}
+                onClick={handleEnhancePrompt}
+                className="flex items-center space-x-1.5 px-3 py-1 bg-gradient-to-r from-primary to-indigo-600 hover:opacity-90 text-white rounded-lg text-[10.5px] font-extrabold transition-all shadow-glow shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Transform your idea into a high-converting commercial ad prompt like ChatGPT"
+              >
+                {isEnhancing ? (
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3 h-3 text-yellow-300" />
+                )}
+                <span>{isEnhancing ? 'Enhancing...' : '🪄 Enhance for Ads'}</span>
+              </button>
             </div>
 
             {/* Prompt Textarea */}
@@ -1204,24 +1283,24 @@ export default function Studio() {
                 ref={promptRef}
                 placeholder={
                   activeMode === 'swap'
-                    ? "Describe desired tweaks (optional) — e.g. Replace character, change outfit, Indian family setting, cinematic lighting..."
+                    ? "Describe desired character tweaks (e.g. Cyberpunk warrior, Indian wedding attire, neon lighting)..."
                     : activeMode === 'image'
-                    ? "Describe the image you want to create in rich detail..."
-                    : "Describe your scene in rich detail — movements, actions, camera shifts, and moody lighting..."
+                    ? "Describe your visual ad idea in rich detail (e.g. Luxury perfume bottle on marble, soft lighting)..."
+                    : "Describe your commercial scene — product actions, camera shifts, and moody lighting..."
                 }
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
-                maxLength="500"
+                maxLength="1500"
                 rows="3"
                 className="w-full bg-surface-elevated text-xs rounded-xl px-4 py-3 border border-white/10 focus:outline-none focus:border-primary text-white resize-none placeholder-white/20"
               />
               <span className="absolute bottom-3 right-3 text-[10px] font-bold text-white/25">
-                {promptText.length}/500
+                {promptText.length}/1500
               </span>
             </div>
             
             <div className="flex items-center justify-between text-[10px] text-white/40 font-semibold uppercase tracking-wider">
-              <span>💡 Include camera pans, style keywords, and lighting for pristine renders</span>
+              <span>💡 Tip: Click "🪄 Enhance for Ads" to add camera angles, 8k textures & cinematic lighting</span>
               <span>Ctrl+Enter to compile</span>
             </div>
           </div>

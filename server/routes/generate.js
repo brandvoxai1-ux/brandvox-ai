@@ -9,6 +9,7 @@ const creditService = require('../services/creditService');
 const { createNotification } = require('../services/notificationService');
 const { archiveVideo, archiveImage } = require('../services/storageService');
 const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
+const { enhanceAdPrompt, STYLE_PRESETS } = require('../services/promptEnhancer');
 
 /**
  * POST /api/generate
@@ -30,8 +31,8 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Please enter a detailed prompt describing your video.' });
   }
 
-  if (prompt.length > 500) {
-    return res.status(400).json({ error: 'Prompts cannot exceed 500 characters.' });
+  if (prompt.length > 2000) {
+    return res.status(400).json({ error: 'Prompts cannot exceed 2000 characters.' });
   }
 
   if (!model_id) {
@@ -273,8 +274,8 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
   if (!prompt || prompt.trim().length === 0) {
     return res.status(400).json({ error: 'Please enter a prompt describing your image.' });
   }
-  if (prompt.length > 500) {
-    return res.status(400).json({ error: 'Prompts cannot exceed 500 characters.' });
+  if (prompt.length > 2000) {
+    return res.status(400).json({ error: 'Prompts cannot exceed 2000 characters.' });
   }
   if (!model_id) {
     return res.status(400).json({ error: 'Please select an image generation model.' });
@@ -441,7 +442,7 @@ router.post('/swap', authMiddleware, generationLimiter, async (req, res) => {
   }
 
   const selectedDuration = parseInt(duration) || 10;
-  const targetModelId = model_id || 'wan-3';
+  const targetModelId = model_id || 'kling-3-omni';
 
   try {
     // 1. Fetch model configuration
@@ -947,6 +948,38 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     console.error('Failed to delete generation:', err);
     res.status(500).json({ error: 'Failed to remove generation.' });
   }
+});
+
+/**
+ * POST /api/generate/enhance-prompt
+ * Transforms a basic user prompt into an agency-grade commercial ad creative prompt
+ */
+router.post('/enhance-prompt', authMiddleware, async (req, res) => {
+  try {
+    const { prompt, style = 'ad-commercial', mode = 'video' } = req.body;
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: 'Please enter a prompt idea to enhance.' });
+    }
+
+    const enhancedPrompt = enhanceAdPrompt(prompt, style, mode);
+    res.json({
+      success: true,
+      enhancedPrompt,
+      originalPrompt: prompt,
+      style
+    });
+  } catch (err) {
+    console.error('[EnhancePrompt] Error:', err);
+    res.status(500).json({ error: 'Failed to enhance prompt.' });
+  }
+});
+
+/**
+ * GET /api/generate/prompt-presets
+ * Returns available commercial creative style presets
+ */
+router.get('/prompt-presets', (req, res) => {
+  res.json({ presets: STYLE_PRESETS });
 });
 
 module.exports = router;
