@@ -8,6 +8,7 @@ const replicateService = require('../services/replicateService');
 const creditService = require('../services/creditService');
 const { createNotification } = require('../services/notificationService');
 const { archiveVideo, archiveImage } = require('../services/storageService');
+const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
 
 /**
  * POST /api/generate
@@ -555,9 +556,12 @@ router.post('/swap', authMiddleware, generationLimiter, async (req, res) => {
         const host = req.get('host');
         const webhookUrl = `${protocol}://${host}/api/generate/webhook`;
 
+        // Ensure reference video is at least 720px per side for Replicate Kling Omni requirement
+        const readyVideoUrl = await ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase);
+
         const result = await replicateService.generateCharacterSwapVideo({
           endpoint: model.fal_endpoint,
-          source_video: source_video_url,
+          source_video: readyVideoUrl,
           target_character: target_character_url,
           prompt,
           aspect_ratio: aspect_ratio || '16:9',

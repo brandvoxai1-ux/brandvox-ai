@@ -47,7 +47,11 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
       const permanentUrl = res.data.url;
       setPreview(permanentUrl);
       onUrlReady(permanentUrl);
-      toast.success('Source video uploaded successfully!');
+      if (res.data?.enhanced) {
+        toast.success(`Video auto-enhanced to ${res.data.width}×${res.data.height} HD for Kling compatibility!`, { icon: '⚡' });
+      } else {
+        toast.success('Source video uploaded successfully!');
+      }
     } catch (err) {
       setPreview(null);
       setFileName('');
