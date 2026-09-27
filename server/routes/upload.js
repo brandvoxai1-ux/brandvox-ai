@@ -4,8 +4,6 @@ const router = express.Router();
 const multer = require('multer');
 const authMiddleware = require('../middleware/auth');
 const supabase = require('../lib/supabase');
-const { processReferenceVideoBuffer } = require('../services/videoProcessor');
-
 // Store file in memory buffer (no disk writes)
 const storage = multer.memoryStorage();
 
@@ -94,20 +92,15 @@ router.post('/video', authMiddleware, videoUpload.single('file'), async (req, re
   }
 
   try {
-    // Automatically verify & upscale video if resolution < 720px for Kling 3.0 Omni compatibility
-    const processed = await processReferenceVideoBuffer(req.file.buffer, req.file.mimetype);
-    const finalBuffer = processed.buffer || req.file.buffer;
-    const isTranscoded = processed.processed;
-    const finalMime = isTranscoded ? 'video/mp4' : req.file.mimetype;
-    const ext = isTranscoded ? 'mp4' : (req.file.mimetype === 'video/quicktime' ? 'mov' : (req.file.mimetype.split('/')[1] || 'mp4'));
+    const ext = req.file.mimetype === 'video/quicktime' ? 'mov' : (req.file.mimetype.split('/')[1] || 'mp4');
     const filename = `${req.user.id}/source_${Date.now()}.${ext}`;
 
-    console.log(`[UploadService] Uploading source reference video: ${filename} (${finalBuffer.length} bytes, optimized: ${isTranscoded})`);
+    console.log(`[UploadService] Fast-uploading source reference video: ${filename} (${req.file.size} bytes)`);
 
     const { data, error } = await supabase.storage
       .from('uploads')
-      .upload(filename, finalBuffer, {
-        contentType: finalMime,
+      .upload(filename, req.file.buffer, {
+        contentType: req.file.mimetype,
         upsert: false
       });
 
@@ -119,15 +112,12 @@ router.post('/video', authMiddleware, videoUpload.single('file'), async (req, re
       .from('uploads')
       .getPublicUrl(filename);
 
-    console.log(`[UploadService] Video upload successful. Public URL: ${publicUrl}`);
+    console.log(`[UploadService] Video upload successful in memory. Public URL: ${publicUrl}`);
 
     res.json({
       success: true,
       url: publicUrl,
-      filename,
-      width: processed.width,
-      height: processed.height,
-      enhanced: isTranscoded
+      filename
     });
   } catch (err) {
     console.error('[UploadService] Video upload failed:', err.message);
