@@ -204,7 +204,7 @@ async function generateImage({ endpoint, prompt, aspect_ratio = '1:1', input_ima
  * @param {string} [params.generationId]
  */
 async function generateCharacterSwapVideo({
-  endpoint = 'wan-3',
+  endpoint = 'kling-3-omni',
   source_video,
   target_character,
   prompt,
@@ -215,33 +215,37 @@ async function generateCharacterSwapVideo({
   const model = resolveReplicateModel(endpoint, 'kwaivgi/kling-v3-omni-video');
   
   const swapPrompt = prompt && prompt.trim()
-    ? `${prompt}, exact motion transfer, cinematic character swap, ultra-photorealistic, high consistency with source choreography, 8k render`
-    : 'Cinematic character replacement, exact motion transfer, photorealistic, preserving original video motion and dynamic choreography';
+    ? `Replace the main subject in <<<video_1>>> with the character in <<<image_1>>>, ${prompt}, exact motion transfer, cinematic character swap, ultra-photorealistic, high consistency with source choreography, 8k render`
+    : 'Replace the main subject in <<<video_1>>> with the character in <<<image_1>>>, exact motion transfer, cinematic character swap, photorealistic, preserving original video motion and dynamic choreography';
 
   const input = {
-    prompt: swapPrompt,
-    aspect_ratio: aspect_ratio || '16:9'
+    prompt: swapPrompt
   };
 
-  if (source_video) {
-    if (model.includes('kling-v3-omni') || model.includes('omni')) {
+  if (model.includes('kling-v3-omni') || model.includes('omni')) {
+    if (source_video) {
       input.reference_video = source_video;
       input.video_reference_type = 'base';
-    } else {
-      input.video = source_video;
+      input.keep_original_sound = true;
     }
-  }
-  if (target_character) {
-    if (model.includes('minimax')) {
-      input.first_frame_image = target_character;
-    } else if (model.includes('kling-v3-omni') || model.includes('omni')) {
-      input.start_image = target_character;
+    if (target_character) {
       input.reference_images = [target_character];
-    } else if (model.includes('kling')) {
-      input.start_image = target_character;
-    } else {
-      input.image = target_character;
+      // Note: Kling Omni in video editing ('base') mode strictly prohibits start_image/end_image (Error 1201).
+      // The character is correctly provided via reference_images and mapped to <<<image_1>>>.
     }
+    input.mode = 'pro';
+  } else if (model.includes('minimax')) {
+    input.aspect_ratio = aspect_ratio || '16:9';
+    if (target_character) input.first_frame_image = target_character;
+    if (source_video) input.video = source_video;
+  } else if (model.includes('kling')) {
+    input.aspect_ratio = aspect_ratio || '16:9';
+    if (target_character) input.start_image = target_character;
+    if (source_video) input.video = source_video;
+  } else {
+    input.aspect_ratio = aspect_ratio || '16:9';
+    if (target_character) input.image = target_character;
+    if (source_video) input.video = source_video;
   }
 
   try {
