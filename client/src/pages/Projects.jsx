@@ -73,9 +73,10 @@ export default function Projects() {
     return () => clearInterval(interval);
   }, [videos, currentPage]);
 
-  // Client side filters
+  // Client side filters (never display failed generation attempts in creations)
   const filteredVideos = videos
     .filter((v) => {
+      if (v.status === 'failed') return false;
       const matchesSearch = v.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             v.prompt?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
@@ -160,7 +161,6 @@ export default function Projects() {
                 <option value="all">All States</option>
                 <option value="completed">Completed</option>
                 <option value="processing">Processing</option>
-                <option value="failed">Failed</option>
               </select>
             </div>
 

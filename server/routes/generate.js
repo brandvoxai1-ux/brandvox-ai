@@ -649,10 +649,17 @@ router.get('/', authMiddleware, async (req, res) => {
     const startRange = (page - 1) * limit;
     const endRange = startRange + limit - 1;
 
-    const { data: gens, error, count } = await supabase
+    let query = supabase
       .from('generations')
       .select('*', { count: 'exact' })
-      .eq('user_id', req.user.id)
+      .eq('user_id', req.user.id);
+
+    // Filter out failed attempts from user's creations list
+    if (req.query.include_failed !== 'true') {
+      query = query.neq('status', 'failed');
+    }
+
+    const { data: gens, error, count } = await query
       .order('created_at', { ascending: false })
       .range(startRange, endRange);
 

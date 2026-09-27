@@ -69,7 +69,34 @@ async function purgeExpiredUploads() {
 }
 
 /**
- * Initializes the automated 24-hour cleanup cron interval
+ * Automatically purges failed generation attempts from Supabase database
+ * so temporary failures don't clutter the database permanently.
+ * Keeps only for a short grace window (10 minutes) so the user has time
+ * to see the error message in the UI while polling.
+ */
+async function purgeFailedGenerations() {
+  const RETENTION_MINUTES = 10;
+  const cutoffTime = new Date(Date.now() - RETENTION_MINUTES * 60 * 1000).toISOString();
+  try {
+    const { data: deleted, error } = await supabase
+      .from('generations')
+      .delete()
+      .eq('status', 'failed')
+      .lt('created_at', cutoffTime)
+      .select('id');
+
+    if (error) {
+      console.warn('[CleanupService] Note on failed generations cleanup:', error.message);
+    } else if (deleted && deleted.length > 0) {
+      console.log(`[CleanupService] Purged ${deleted.length} obsolete failed generation records.`);
+    }
+  } catch (err) {
+    console.error('[CleanupService] Failed generations purge exception:', err.message);
+  }
+}
+
+/**
+ * Initializes the automated cleanup workers
  */
 function initCleanupService() {
   console.log('[CleanupService] Initializing 7-Day Ephemeral Storage Privacy Worker...');
@@ -84,9 +111,20 @@ function initCleanupService() {
   setInterval(() => {
     purgeExpiredUploads();
   }, TWENTY_FOUR_HOURS);
+
+  // Check and purge obsolete failed generations on startup and every 10 minutes
+  setTimeout(() => {
+    purgeFailedGenerations();
+  }, 10000);
+
+  const TEN_MINUTES = 10 * 60 * 1000;
+  setInterval(() => {
+    purgeFailedGenerations();
+  }, TEN_MINUTES);
 }
 
 module.exports = {
   initCleanupService,
-  purgeExpiredUploads
+  purgeExpiredUploads,
+  purgeFailedGenerations
 };

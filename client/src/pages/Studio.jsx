@@ -112,6 +112,7 @@ export default function Studio() {
   const [activeImageUrl, setActiveImageUrl] = useState(null);
   const [imageGenerating, setImageGenerating] = useState(false);
   const [activeGenerationId, setActiveGenerationId] = useState(null);
+  const [failedGenId, setFailedGenId] = useState(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState('idle'); // 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
   const [generationError, setGenerationError] = useState('');
@@ -346,8 +347,10 @@ export default function Studio() {
           }
           setGenerationStatus('idle');
         } else if (res.status === 'failed') {
+          const failedId = res.id || activeGenerationId;
           setGenerationStatus('failed');
           setGenerationError(res.error_message || 'API request timeout.');
+          setFailedGenId(failedId);
           setActiveGenerationId(null);
           toast.error('AI compilation failed. Cost refunded.');
           await refreshProfile();
@@ -361,6 +364,31 @@ export default function Studio() {
     return () => clearInterval(interval);
   }, [activeGenerationId]);
 
+  // Dismiss failed error and immediately purge failed attempt from database
+  const handleDismissError = async () => {
+    if (failedGenId) {
+      const idToDelete = failedGenId;
+      setFailedGenId(null);
+      try {
+        await deleteGeneration(idToDelete);
+      } catch (err) {
+        console.warn('[Studio] Auto-removal of failed generation from DB:', err);
+      }
+    }
+    setGenerationStatus('idle');
+    setGenerationError('');
+  };
+
+  // Auto-clean failed generation attempt from DB after showing for a while (90s)
+  useEffect(() => {
+    if (generationStatus === 'failed' && failedGenId) {
+      const timer = setTimeout(() => {
+        handleDismissError();
+      }, 90000);
+      return () => clearTimeout(timer);
+    }
+  }, [generationStatus, failedGenId]);
+
   // Prompt Templates Categories
   const promptTemplates = [
     { label: '🎬 Cinematic', text: 'Cinematic tracking shot of a futuristic cyberpunk cityscape at night, neon reflections in puddles, atmospheric fog, detailed architecture, photorealistic 8k.' },
@@ -372,6 +400,10 @@ export default function Studio() {
 
   // Dispatch Generation job
   const handleGenerate = async () => {
+    if (failedGenId) {
+      deleteGeneration(failedGenId).catch(() => {});
+      setFailedGenId(null);
+    }
     if (!selectedModel) {
       toast.error('No AI Model selected.');
       return;
@@ -1007,7 +1039,7 @@ export default function Studio() {
                       <X className="w-10 h-10 text-error p-2 bg-error/15 rounded-full border border-error/25 animate-bounce" />
                       <h4 className="text-sm font-extrabold text-error">AI Synthesis Disrupted</h4>
                       <p className="text-xs text-white/50 max-w-sm leading-relaxed">{generationError}</p>
-                      <Button variant="secondary" size="sm" onClick={() => setGenerationStatus('idle')}>
+                      <Button variant="secondary" size="sm" onClick={handleDismissError}>
                         Try Again
                       </Button>
                     </div>
