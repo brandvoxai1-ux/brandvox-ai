@@ -31,14 +31,20 @@ const REPLICATE_MODEL_MAP = {
   // SOTA Video Models (2025/2026)
   'fal-ai/minimax/video-01': 'minimax/video-01',
   'minimax-hailuo': 'minimax/video-01',
-  'google-veo-3': 'minimax/video-01',
-  'fal-ai/kling-video/v1.6/standard/text-to-video': 'kuaishou/kling-v1',
-  'kling-video-1-6': 'kuaishou/kling-v1',
-  'kling-3-omni': 'kuaishou/kling-v1',
+  'google-veo-3': 'kwaivgi/kling-v3-video',
+  'fal-ai/kling-video/v1.6/standard/text-to-video': 'kwaivgi/kling-v3-video',
+  'kling-video-1-6': 'kwaivgi/kling-v3-video',
+  'kling-3-omni': 'kwaivgi/kling-v3-omni-video',
+  'kuaishou/kling-v1': 'kwaivgi/kling-v3-video',
+  'kuaishou/kling-video': 'kwaivgi/kling-v3-video',
+  'kwaivgi/kling-v1': 'kwaivgi/kling-v3-video',
+  'kwaivgi/kling-v1.6': 'kwaivgi/kling-v3-video',
   'fal-ai/wan/v2.5/text-to-video': 'wan-video/wan-2.1-1.3b',
   'wan-2-5-fast': 'wan-video/wan-2.1-1.3b',
-  'wan-2-1-14b': 'wan-video/wan-2.1-14b',
-  'wan-3': 'wan-video/wan-2.1-14b',
+  'wan-2-1-14b': 'wan-video/wan-2.1-1.3b',
+  'wan-video/wan-2.1-14b': 'wan-video/wan-2.1-1.3b',
+  'wan-video/wan-2.1': 'wan-video/wan-2.1-1.3b',
+  'wan-3': 'wan-video/wan-2.1-1.3b',
   'fal-ai/hunyuan-video': 'wan-video/wan-2.1-1.3b',
   'seedance-2-0-fast': 'wan-video/wan-2.1-1.3b',
   'seedance-2-fast': 'wan-video/wan-2.1-1.3b',
@@ -57,7 +63,12 @@ function resolveReplicateModel(endpoint, defaultModel = 'black-forest-labs/flux-
   if (REPLICATE_MODEL_MAP[endpoint]) {
     return REPLICATE_MODEL_MAP[endpoint];
   }
-  // If already in owner/model format (e.g. wan-video/wan-2.1-1.3b)
+  // Intercept any invalid kuaishou or legacy naming
+  if (endpoint.startsWith('kuaishou/')) {
+    if (endpoint.includes('omni')) return 'kwaivgi/kling-v3-omni-video';
+    return 'kwaivgi/kling-v3-video';
+  }
+  // If already in owner/model format (e.g. wan-video/wan-2.1-1.3b, kwaivgi/kling-v3-video)
   if (endpoint.includes('/') && !endpoint.startsWith('fal-ai/')) {
     return endpoint;
   }
@@ -201,7 +212,7 @@ async function generateCharacterSwapVideo({
   webhookUrl,
   generationId
 }) {
-  const model = resolveReplicateModel(endpoint, 'wan-video/wan-2.1-14b');
+  const model = resolveReplicateModel(endpoint, 'kwaivgi/kling-v3-omni-video');
   
   const swapPrompt = prompt && prompt.trim()
     ? `${prompt}, exact motion transfer, cinematic character swap, ultra-photorealistic, high consistency with source choreography, 8k render`
@@ -213,11 +224,19 @@ async function generateCharacterSwapVideo({
   };
 
   if (source_video) {
-    input.video = source_video;
+    if (model.includes('kling-v3-omni') || model.includes('omni')) {
+      input.reference_video = source_video;
+      input.video_reference_type = 'base';
+    } else {
+      input.video = source_video;
+    }
   }
   if (target_character) {
     if (model.includes('minimax')) {
       input.first_frame_image = target_character;
+    } else if (model.includes('kling-v3-omni') || model.includes('omni')) {
+      input.start_image = target_character;
+      input.reference_images = [target_character];
     } else if (model.includes('kling')) {
       input.start_image = target_character;
     } else {
@@ -274,9 +293,24 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
   } else if (model.includes('wan')) {
     // Wan 2.1 SOTA accepts aspect_ratio ('16:9', '9:16', '1:1')
     input.aspect_ratio = aspect_ratio || '16:9';
-    if (image_url) input.image = image_url;
+    if (resolution === '720p' || resolution === '480p') {
+      input.resolution = resolution;
+    }
   } else if (model.includes('kling')) {
+    input.aspect_ratio = aspect_ratio || '16:9';
+    if (duration) {
+      const parsedDur = parseInt(duration, 10);
+      if (!isNaN(parsedDur)) {
+        input.duration = Math.max(3, Math.min(15, parsedDur));
+      }
+    }
     if (image_url) input.start_image = image_url;
+    input.generate_audio = generate_audio !== false;
+    if (resolution === '1080p') {
+      input.mode = 'pro';
+    } else if (resolution === '720p') {
+      input.mode = 'standard';
+    }
   } else {
     if (image_url) input.first_frame_image = image_url;
   }

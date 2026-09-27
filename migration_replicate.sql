@@ -47,7 +47,7 @@ SET fal_endpoint = 'minimax/video-01'
 WHERE id = 'minimax-hailuo';
 
 UPDATE public.models
-SET fal_endpoint = 'kuaishou/kling-v1'
+SET fal_endpoint = 'kwaivgi/kling-v3-video', provider = 'KwaiVGI (Kling)'
 WHERE id = 'kling-video-1-6';
 
 UPDATE public.models

@@ -38,7 +38,7 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
   }
 
   const selectedDuration = parseInt(duration) || 10; // default 10 seconds
-  const selectedAudio = !!generate_audio;
+  const selectedAudio = generate_audio !== undefined ? !!generate_audio : true;
 
   try {
     // 2. Fetch model configuration to calculate exact cost

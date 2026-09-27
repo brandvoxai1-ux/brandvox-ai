@@ -32,8 +32,8 @@ VALUES
   (
     'kling-3-omni',
     'Kling 3.0 Omni Director',
-    'Kuaishou',
-    'kuaishou/kling-v1',
+    'KwaiVGI (Kling)',
+    'kwaivgi/kling-v3-omni-video',
     'State-of-the-art character replacement, video-to-video motion transfer, and director camera physics.',
     4.50, 15,
     ARRAY['720p', '1080p'],

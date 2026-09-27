@@ -32,7 +32,9 @@ import {
   Check,
   UserCheck,
   ShieldCheck,
-  Video as VideoIcon
+  Video as VideoIcon,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -56,6 +58,10 @@ export default function Studio() {
   const [resolution, setResolution] = useState('720p');
   const [aspectRatio, setAspectRatio] = useState('16:9');
   const [duration, setDuration] = useState(6);
+  const [generateAudio, setGenerateAudio] = useState(true);
+  const [mediaDimensions, setMediaDimensions] = useState(null); // { width, height, ratio }
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  const videoPlayerRef = useRef(null);
   const [modelSearch, setModelSearch] = useState('');
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const modelPickerRef = useRef(null);
@@ -115,6 +121,104 @@ export default function Studio() {
   const [queueVideos, setQueueVideos] = useState([]);
   const [historyVideos, setHistoryVideos] = useState([]);
   const [watermarkRequired, setWatermarkRequired] = useState(true);
+
+  // Reset detected dimensions whenever media changes
+  useEffect(() => {
+    setMediaDimensions(null);
+    setIsVideoMuted(false);
+  }, [activeVideo?.id, activeVideo?.video_url, activeImageUrl, activeMode]);
+
+  // Video element metadata handler (reads actual video file dimensions)
+  const handleVideoMetadata = (e) => {
+    const { videoWidth, videoHeight } = e.target;
+    if (videoWidth && videoHeight) {
+      setMediaDimensions({
+        width: videoWidth,
+        height: videoHeight,
+        ratio: videoWidth / videoHeight
+      });
+    }
+  };
+
+  // Image element load handler (reads actual image file dimensions)
+  const handleImageLoad = (e) => {
+    const { naturalWidth, naturalHeight } = e.target;
+    if (naturalWidth && naturalHeight) {
+      setMediaDimensions({
+        width: naturalWidth,
+        height: naturalHeight,
+        ratio: naturalWidth / naturalHeight
+      });
+    }
+  };
+
+  // Calculate dynamic aspect ratio & auto-fit container sizing for the Studio canvas
+  const getCanvasAspectConfig = () => {
+    // 1. Natural media dimensions detected from loaded video or image file
+    if (mediaDimensions?.ratio) {
+      const r = mediaDimensions.ratio;
+      if (r < 0.75) {
+        // Vertical Portrait (9:16 Shorts / Reels / TikTok)
+        return {
+          wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[58vh]',
+          aspectRatio: '9/16',
+          label: '9:16 Portrait'
+        };
+      } else if (r >= 0.75 && r <= 1.25) {
+        // Square (1:1 Feed / Square)
+        return {
+          wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[58vh]',
+          aspectRatio: '1/1',
+          label: '1:1 Square'
+        };
+      } else if (r > 1.25 && r <= 1.55) {
+        // Standard (4:3)
+        return {
+          wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[58vh]',
+          aspectRatio: '4/3',
+          label: '4:3 Standard'
+        };
+      } else {
+        // Widescreen Landscape (16:9)
+        return {
+          wrapperClass: 'w-full max-w-xl aspect-video max-h-[58vh]',
+          aspectRatio: '16/9',
+          label: '16:9 Landscape'
+        };
+      }
+    }
+
+    // 2. Active video saved aspect ratio in DB
+    const targetAspect = activeVideo?.aspect_ratio || aspectRatio;
+    if (targetAspect === '9:16') {
+      return {
+        wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[58vh]',
+        aspectRatio: '9/16',
+        label: '9:16 Portrait'
+      };
+    } else if (targetAspect === '1:1') {
+      return {
+        wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[58vh]',
+        aspectRatio: '1/1',
+        label: '1:1 Square'
+      };
+    } else if (targetAspect === '4:3') {
+      return {
+        wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[58vh]',
+        aspectRatio: '4/3',
+        label: '4:3 Standard'
+      };
+    }
+
+    // Default 16:9 Landscape
+    return {
+      wrapperClass: 'w-full max-w-xl aspect-video max-h-[58vh]',
+      aspectRatio: '16/9',
+      label: '16:9 Landscape'
+    };
+  };
+
+  const canvasAspect = getCanvasAspectConfig();
 
   // Default select first active model
   useEffect(() => {
@@ -367,7 +471,7 @@ export default function Studio() {
         duration: duration,
         resolution: resolution,
         aspect_ratio: aspectRatio,
-        generate_audio: !!selectedModel?.supports_audio,
+        generate_audio: generateAudio && (selectedModel?.supports_audio !== false),
         image_url: imageUrl || null
       };
 
@@ -728,11 +832,31 @@ export default function Studio() {
               </div>
             )}
 
-            {/* Audio indicator (video only) */}
-            {activeMode === 'video' && selectedModel?.supports_audio && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/8 border border-primary/15">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse" />
-                <span className="text-[9px] font-bold text-primary/70 uppercase tracking-wider">Audio generation included</span>
+            {/* Audio Toggle (video only) */}
+            {activeMode === 'video' && (
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/8 transition-all">
+                <div className="flex items-center space-x-2.5">
+                  <div className={`p-1.5 rounded-lg ${generateAudio && selectedModel?.supports_audio ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/30'}`}>
+                    <Volume2 className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold text-white block">Generate Audio</span>
+                    <span className="text-[9px] text-white/40 block">
+                      {selectedModel?.supports_audio ? 'Native cinematic sound & SFX' : 'Silent model (No audio)'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={!selectedModel?.supports_audio}
+                  onClick={() => setGenerateAudio(!generateAudio)}
+                  className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ease-in-out ${
+                    generateAudio && selectedModel?.supports_audio ? 'bg-primary justify-end' : 'bg-white/20 justify-start'
+                  } ${!selectedModel?.supports_audio ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  title={selectedModel?.supports_audio ? (generateAudio ? 'Sound enabled' : 'Sound disabled') : 'This model does not support audio'}
+                >
+                  <div className="w-4 h-4 bg-white rounded-full shadow-md" />
+                </button>
               </div>
             )}
           </div>
@@ -802,7 +926,7 @@ export default function Studio() {
           {/* Active Canvas Tabs Panels */}
           <div className="flex-grow flex items-center justify-center">
             {activeCanvasTab === 'editor' && (
-              <div className="w-full max-w-xl aspect-video glass-premium rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden relative shadow-premium">
+              <div className={`transition-all duration-300 ease-out glass-premium rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden relative shadow-premium ${canvasAspect.wrapperClass}`}>
                 
                 {/* IMAGE MODE CANVAS */}
                 {activeMode === 'image' ? (
@@ -819,17 +943,25 @@ export default function Studio() {
                       </div>
                     </div>
                   ) : activeImageUrl ? (
-                    <div className="relative w-full h-full group flex items-center justify-center bg-black">
+                    <div className="relative w-full h-full group flex items-center justify-center bg-black/95">
                       <img
                         src={activeImageUrl}
                         alt="Generated result"
+                        onLoad={handleImageLoad}
                         className="w-full h-full object-contain"
                       />
+                      <div className="absolute top-3 right-3 px-2 py-0.5 bg-black/70 backdrop-blur-md rounded-md border border-white/10 text-[9.5px] font-bold text-white/80 z-20 pointer-events-none flex items-center gap-1.5 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                        <span>{canvasAspect.label}</span>
+                        {mediaDimensions && (
+                          <span className="text-white/40">({mediaDimensions.width}×{mediaDimensions.height})</span>
+                        )}
+                      </div>
                       <a
                         href={activeImageUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black/90 backdrop-blur-sm border border-white/15 rounded-lg text-xs font-bold text-white transition-colors"
+                        className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black/90 backdrop-blur-sm border border-white/15 rounded-lg text-xs font-bold text-white transition-colors z-20"
                       >
                         Download Image
                       </a>
@@ -843,6 +975,9 @@ export default function Studio() {
                       <p className="text-xs text-white/50 max-w-xs leading-relaxed font-semibold">
                         Describe your vision below {remixImageUrl ? 'to remix with your uploaded reference' : `and select an image model (${selectedModel?.name || 'Nano Banana 2.0'}) to create artwork`}.
                       </p>
+                      <div className="text-[10px] text-white/40 font-bold uppercase tracking-widest bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
+                        Target Framing: {canvasAspect.label}
+                      </div>
                     </div>
                   )
                 ) : (
@@ -878,15 +1013,41 @@ export default function Studio() {
                     </div>
                   ) : activeVideo ? (
                     /* Active video playing VLC Frame */
-                    <div className="relative w-full h-full group">
+                    <div className="relative w-full h-full group flex items-center justify-center bg-black/95">
                       <video
+                        ref={videoPlayerRef}
                         src={activeVideo.video_url}
                         controls
                         autoPlay
                         playsInline
                         loop
-                        className="w-full h-full object-cover"
+                        onLoadedMetadata={handleVideoMetadata}
+                        className="w-full h-full object-contain"
                       />
+
+                      {/* Dynamic Format/Resolution Badge */}
+                      <div className="absolute top-3 right-3 px-2 py-0.5 bg-black/70 backdrop-blur-md rounded-md border border-white/10 text-[9.5px] font-bold text-white/80 z-20 pointer-events-none flex items-center gap-1.5 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                        <span>{canvasAspect.label}</span>
+                        {mediaDimensions && (
+                          <span className="text-white/40">({mediaDimensions.width}×{mediaDimensions.height})</span>
+                        )}
+                      </div>
+
+                      {/* Quick Audio Mute / Unmute Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (videoPlayerRef.current) {
+                            videoPlayerRef.current.muted = !videoPlayerRef.current.muted;
+                            setIsVideoMuted(videoPlayerRef.current.muted);
+                          }
+                        }}
+                        className="absolute bottom-3 left-3 p-1.5 bg-black/70 hover:bg-black/90 backdrop-blur-md rounded-lg border border-white/10 text-white/80 hover:text-white transition-colors z-20 cursor-pointer"
+                        title={isVideoMuted ? "Unmute Audio" : "Mute Audio"}
+                      >
+                        {isVideoMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-primary" />}
+                      </button>
 
                       {/* Dynamic Premium Watermark Overlay for free accounts */}
                       {watermarkRequired && (
@@ -912,6 +1073,9 @@ export default function Studio() {
                       <p className="text-xs text-white/50 max-w-xs leading-relaxed font-semibold">
                         Describe your concept below and trigger generation to render your cinematic reel.
                       </p>
+                      <div className="text-[10px] text-white/40 font-bold uppercase tracking-widest bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
+                        Target Framing: {canvasAspect.label}
+                      </div>
                     </div>
                   )
                 )}
