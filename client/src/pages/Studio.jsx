@@ -681,6 +681,9 @@ export default function Studio() {
                   onClear={() => setSourceVideoUrl('')}
                   compact
                 />
+                <p className="text-[8.5px] text-white/35 font-medium leading-tight">
+                  Upload 3–10s MP4/MOV with clear subject motion. Auto-enhanced to 720p+ HD.
+                </p>
               </div>
 
               {/* Step 2: Target Character */}
@@ -705,6 +708,9 @@ export default function Studio() {
                   onClear={() => setImageUrl('')}
                   compact
                 />
+                <p className="text-[8.5px] text-white/35 font-medium leading-tight">
+                  Clear front-facing portrait or character photo. Leave blank if only using prompt.
+                </p>
               </div>
 
               {/* Ephemeral Storage Retention Badge */}

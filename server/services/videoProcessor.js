@@ -59,9 +59,10 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
 
     const needsUpscale = width < 720 || height < 720;
     const needsTrim = duration > 10.5;
+    const needsLoop = duration < 3.0;
 
-    if (!needsUpscale && !needsTrim) {
-      console.log('[videoProcessor] Video already satisfies Replicate 720px+ and <=10s requirements.');
+    if (!needsUpscale && !needsTrim && !needsLoop) {
+      console.log('[videoProcessor] Video already satisfies Replicate 720px+ and 3–10s requirements.');
       return { buffer: inputBuffer, width, height, processed: false };
     }
 
@@ -79,8 +80,10 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
 
     // Build FFmpeg command with high quality bicubic scaling and audio preservation
     const filter = `scale=${targetW}:${targetH}:flags=bicubic`;
-    const durationLimit = needsTrim ? '-t 10' : '';
-    const ffmpegCmd = `ffmpeg -y -i "${inputPath}" ${durationLimit} -vf "${filter}" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 19 -c:a aac -b:a 192k "${outputPath}"`;
+    const loopCount = needsLoop ? Math.max(1, Math.ceil(3.5 / Math.max(0.5, duration)) - 1) : 0;
+    const loopArg = loopCount > 0 ? `-stream_loop ${loopCount} ` : '';
+    const durationLimit = needsTrim ? '-t 10' : (needsLoop ? '-t 4' : '');
+    const ffmpegCmd = `ffmpeg -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 19 -c:a aac -b:a 192k "${outputPath}"`;
 
     console.log(`[videoProcessor] Running FFmpeg optimization: ${ffmpegCmd}`);
     await execPromise(ffmpegCmd);

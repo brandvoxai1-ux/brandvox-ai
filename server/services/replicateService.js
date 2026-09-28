@@ -221,28 +221,40 @@ async function generateCharacterSwapVideo({
     : 'kwaivgi/kling-v3-omni-video';
 
   const input = {};
+  const hasTargetPhoto = Boolean(target_character && String(target_character).trim());
 
   if (model.includes('seedance')) {
-    input.prompt = prompt && prompt.trim()
-      ? `Replace the main character in [Video1] with the subject in [Image1], ${prompt}, seamless motion transfer, cinematic character swap, 8k render, high realism`
-      : 'Replace the main character in [Video1] with the subject in [Image1], seamless motion transfer, preserving original choreography and movement, cinematic 8k';
+    if (hasTargetPhoto) {
+      input.prompt = prompt && prompt.trim()
+        ? `Replace the main character in [Video1] with the person in [Image1], ${prompt}, seamless motion transfer, perfect facial resemblance, identical head choreography, high realism, 8k render`
+        : 'Replace the main character in [Video1] with the person in [Image1], seamless motion transfer, exact facial features, preserving original choreography and movement, cinematic 8k';
+      input.reference_images = [target_character];
+    } else {
+      input.prompt = prompt && prompt.trim()
+        ? `Transform the main character in [Video1] into: ${prompt}, exact motion transfer, preserving original movement and choreography, cinematic 8k`
+        : 'Transform the character in [Video1], exact motion transfer, preserving original movement and choreography, cinematic 8k';
+    }
     if (source_video) input.reference_videos = [source_video];
-    if (target_character) input.reference_images = [target_character];
     input.resolution = '720p';
     input.generate_audio = true;
   } else {
     // Kling v3 Omni Director
-    input.prompt = prompt && prompt.trim()
-      ? `Replace the main subject in <<<video_1>>> with the character in <<<image_1>>>, ${prompt}, exact motion transfer, cinematic character swap, ultra-photorealistic, high consistency with source choreography, 8k render`
-      : 'Replace the main subject in <<<video_1>>> with the character in <<<image_1>>>, exact motion transfer, cinematic character swap, photorealistic, preserving original video motion and dynamic choreography';
+    if (hasTargetPhoto) {
+      input.prompt = prompt && prompt.trim()
+        ? `Exact character replacement of <<<video_1>>> with <<<image_1>>>, ${prompt}, preserve original head orientation, precise facial anatomy matching, identical skin tone and facial structure, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic`
+        : 'Exact character replacement of <<<video_1>>> with <<<image_1>>>, preserve original head orientation, precise facial anatomy matching, identical skin tone and facial structure, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic';
+      input.reference_images = [target_character];
+    } else {
+      input.prompt = prompt && prompt.trim()
+        ? `Transform the character in <<<video_1>>> into: ${prompt}, exact motion transfer, cinematic 8k photorealistic, match original choreography and camera movement`
+        : 'Transform the character in <<<video_1>>>, exact motion transfer, cinematic 8k photorealistic, match original choreography and camera movement';
+    }
     if (source_video) {
       input.reference_video = source_video;
       input.video_reference_type = 'base';
       input.keep_original_sound = true;
     }
-    if (target_character) {
-      input.reference_images = [target_character];
-    }
+    // Note: generate_audio is strictly omitted here because it is mutually exclusive with reference_video on Kling Omni
     input.mode = 'pro';
   }
 

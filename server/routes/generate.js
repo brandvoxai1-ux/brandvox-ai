@@ -419,11 +419,11 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
 });
 
 /**
- * POST /api/generate/swap
+ * POST /api/generate/swap (and alias /api/generate/character-swap)
  * Character Replacement / Video-to-Video Motion Transfer Pipeline
  * Uploads reference source video + target character reference
  */
-router.post('/swap', authMiddleware, generationLimiter, async (req, res) => {
+router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, async (req, res) => {
   const {
     source_video_url,
     target_character_url,
@@ -553,9 +553,8 @@ router.post('/swap', authMiddleware, generationLimiter, async (req, res) => {
           .update({ status: 'processing' })
           .eq('id', generation.id);
 
-        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-        const host = req.get('host');
-        const webhookUrl = `${protocol}://${host}/api/generate/webhook`;
+        const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
+        const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
 
         // Ensure reference video is at least 720px per side for Replicate Kling Omni requirement
         const readyVideoUrl = await ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase);
@@ -570,7 +569,47 @@ router.post('/swap', authMiddleware, generationLimiter, async (req, res) => {
           generationId: generation.id
         });
 
-        if (result.video_url) {
+        if (result.request_id) {
+          // Store prediction ID in DB to track it
+          await supabase
+            .from('generations')
+            .update({ fal_request_id: result.request_id })
+            .eq('id', generation.id);
+
+          // Local webhook simulation / polling
+          const isLocalhost = webhookUrl.includes('localhost') || webhookUrl.includes('127.0.0.1');
+          if (isLocalhost) {
+            console.log(`[CharacterSwap] Localhost environment detected. Initiating background prediction polling for: ${result.request_id}`);
+            (async () => {
+              try {
+                let status = 'starting';
+                let currentResult = null;
+
+                // Poll status every 3 seconds up to 120 times (6 minutes limit)
+                for (let attempt = 0; attempt < 120; attempt++) {
+                  await new Promise(resolve => setTimeout(resolve, 3000));
+                  currentResult = await replicateService.getPredictionStatus(result.request_id);
+                  status = currentResult.status;
+
+                  if (status === 'succeeded' || status === 'failed' || status === 'canceled') {
+                    break;
+                  }
+                }
+
+                if (status === 'succeeded') {
+                  console.log(`[CharacterSwap] Local poll completed successfully for: ${generation.id}`);
+                  await handleWebhookLogic(generation.id, 'OK', currentResult.output, null);
+                } else {
+                  console.error(`[CharacterSwap] Local poll failed/timed out for: ${generation.id}. Status: ${status}`);
+                  await handleWebhookLogic(generation.id, 'ERROR', null, currentResult?.error || 'Replicate polling timeout or failed');
+                }
+              } catch (pollErr) {
+                console.error(`[CharacterSwap] Local poll critical error for: ${generation.id}`, pollErr);
+                await handleWebhookLogic(generation.id, 'ERROR', null, pollErr.message);
+              }
+            })();
+          }
+        } else if (result.video_url) {
           const placeholderThumb = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500';
           await supabase
             .from('generations')
