@@ -463,8 +463,8 @@ export default function Studio() {
       return;
     }
 
-    if (activeMode === 'video' && imageUrl && !selectedModel?.supports_image_input) {
-      toast.error('The selected model does not support image input. Remove the image or switch to an image-to-video model.');
+    if (activeMode === 'video' && imageUrl && selectedModel?.supports_image_input === false && !selectedModel.id.includes('seedance') && !selectedModel.id.includes('kling') && !selectedModel.id.includes('minimax')) {
+      toast.error('The selected model does not support image input. Remove the image or switch to an image-compatible model.');
       return;
     }
 
@@ -619,10 +619,13 @@ export default function Studio() {
           {activeMode === 'video' && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Media (Optional)</label>
+                <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Media (Optional)</label>
                 {imageUrl && (
                   <button
-                    onClick={() => setImageUrl('')}
+                    onClick={() => {
+                      setImageUrl('');
+                      setMediaDimensions(null);
+                    }}
                     className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
                   >
                     Clear
@@ -633,25 +636,46 @@ export default function Studio() {
               {imageUrl ? (
                 /* Preview of attached image */
                 <div className="relative rounded-xl overflow-hidden border border-white/8 aspect-video bg-black">
-                  <img src={imageUrl} alt="Source" className="w-full h-full object-cover" />
+                  <img src={imageUrl} alt="Reference Character" className="w-full h-full object-cover" />
                   <button
-                    onClick={() => setImageUrl('')}
+                    onClick={() => {
+                      setImageUrl('');
+                      setMediaDimensions(null);
+                    }}
                     className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-error transition-colors cursor-pointer"
+                    title="Remove reference photo"
                   >
                     <X className="w-3 h-3" />
                   </button>
                   <div className="absolute bottom-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded text-[9px] font-bold text-white/70 uppercase tracking-wider">
-                    Image→Video
+                    Reference Image Active
                   </div>
                 </div>
               ) : (
                 /* Upload zone */
-                <ImageUploader
-                  value={imageUrl}
-                  onUrlReady={(url) => setImageUrl(url)}
-                  onClear={() => setImageUrl('')}
-                  compact
-                />
+                <div>
+                  <ImageUploader
+                    value={imageUrl}
+                    onUrlReady={(url) => setImageUrl(url)}
+                    onDimensionsDetected={({ ratio }) => {
+                      if (ratio < 0.75 && selectedModel?.supported_aspects?.includes('9:16')) {
+                        setAspectRatio('9:16');
+                      } else if (ratio > 1.35 && selectedModel?.supported_aspects?.includes('16:9')) {
+                        setAspectRatio('16:9');
+                      } else if (selectedModel?.supported_aspects?.includes('1:1')) {
+                        setAspectRatio('1:1');
+                      }
+                    }}
+                    onClear={() => {
+                      setImageUrl('');
+                      setMediaDimensions(null);
+                    }}
+                    compact
+                  />
+                  <p className="text-[8.5px] text-white/35 font-medium leading-tight mt-1">
+                    Optional: Leave empty for text-to-video. If uploaded, AI will use this character or starting frame.
+                  </p>
+                </div>
               )}
             </div>
           )}

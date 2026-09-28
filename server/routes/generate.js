@@ -55,9 +55,9 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Selected model is not active or unavailable.' });
     }
 
-    // Assert inputs compatibility
-    if (model.supports_image_input && !image_url) {
-      return res.status(400).json({ error: 'An input image URL is required for this image-to-video model.' });
+    // Assert inputs compatibility: Only enforce image requirement if the model is strictly an image-to-video animator
+    if (model.id === 'seedance-2-i2v' && !image_url) {
+      return res.status(400).json({ error: 'An input image URL is required for Image-to-Video animation.' });
     }
 
     if (selectedDuration > model.max_duration) {

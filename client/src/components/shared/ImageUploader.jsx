@@ -5,11 +5,83 @@ import api from '../../lib/api';
 import toast from 'react-hot-toast';
 
 /**
+ * Normalizes an image file to standard RGB JPEG, ensuring:
+ * 1. Minimum 512px dimensions (prevents tiny image pixel errors)
+ * 2. Width & Height are multiples of 16 (neural network grid alignment)
+ * 3. Alpha channel is flattened onto a solid background (prevents RGBA pixel errors)
+ */
+function sanitizeImageFile(file) {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      return resolve({ blob: file, width: null, height: null, ratio: null });
+    }
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { naturalWidth: width, naturalHeight: height } = img;
+
+      if (!width || !height) {
+        return resolve({ blob: file, width: null, height: null, ratio: null });
+      }
+
+      // Enforce minimum dimension of 512px while preserving ratio
+      const minDimension = 512;
+      if (width < minDimension || height < minDimension) {
+        const scale = Math.max(minDimension / width, minDimension / height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+
+      // Ensure width & height are multiples of 16
+      width = Math.max(16, Math.round(width / 16) * 16);
+      height = Math.max(16, Math.round(height / 16) * 16);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      // Fill with solid neutral background to strip alpha transparency channel
+      ctx.fillStyle = '#121214';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw image onto canvas
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const cleanFile = new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.jpg', {
+              type: 'image/jpeg'
+            });
+            resolve({ blob: cleanFile, width, height, ratio: width / height });
+          } else {
+            resolve({ blob: file, width, height, ratio: width / height });
+          }
+        },
+        'image/jpeg',
+        0.95
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({ blob: file, width: null, height: null, ratio: null });
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
  * ImageUploader
  * Pure file dropzone for target character & reference images (JPEG, PNG, WebP, GIF up to 20MB).
- * Automatically uploads file to ephemeral cloud storage for the AI pipeline.
+ * Automatically sanitizes pixels and uploads file to ephemeral cloud storage for the AI pipeline.
  */
-export default function ImageUploader({ value, onUrlReady, onClear, compact = false }) {
+export default function ImageUploader({ value, onUrlReady, onClear, onDimensionsDetected, compact = false }) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(value || null);
@@ -36,8 +108,15 @@ export default function ImageUploader({ value, onUrlReady, onClear, compact = fa
     setUploading(true);
 
     try {
+      // Pre-flight sanitize: flatten alpha channel, enforce >=512px, divisible by 16
+      const { blob: cleanFile, width, height, ratio } = await sanitizeImageFile(file);
+
+      if (ratio && onDimensionsDetected) {
+        onDimensionsDetected({ width, height, ratio });
+      }
+
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', cleanFile || file);
 
       const res = await api.post('/upload/image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -46,7 +125,7 @@ export default function ImageUploader({ value, onUrlReady, onClear, compact = fa
       const permanentUrl = res.data.url;
       setPreview(permanentUrl);
       onUrlReady(permanentUrl);
-      toast.success('Character image uploaded successfully!');
+      toast.success('Character image uploaded & optimized successfully!');
     } catch (err) {
       setPreview(null);
       setFileName('');
@@ -55,7 +134,7 @@ export default function ImageUploader({ value, onUrlReady, onClear, compact = fa
       setUploading(false);
       URL.revokeObjectURL(localPreview);
     }
-  }, [onUrlReady]);
+  }, [onUrlReady, onDimensionsDetected]);
 
   const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);

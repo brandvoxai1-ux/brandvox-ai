@@ -300,10 +300,13 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
   const model = resolveReplicateModel(endpoint, 'minimax/video-01');
 
   const input = { prompt };
+  const cleanImageUrl = image_url && typeof image_url === 'string' && image_url.trim() ? image_url.trim() : null;
 
   if (model.includes('seedance')) {
     input.resolution = resolution || '720p';
-    input.aspect_ratio = aspect_ratio || '16:9';
+    // When reference/start image is provided, use 'adaptive' per ByteDance specification
+    // to match image natural geometry and prevent 'Image pixel is invalid' errors
+    input.aspect_ratio = cleanImageUrl ? 'adaptive' : (aspect_ratio || '16:9');
     if (duration) {
       const parsedDur = parseInt(duration, 10);
       if (!isNaN(parsedDur)) {
@@ -311,14 +314,15 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
       }
     }
     input.generate_audio = generate_audio !== false;
-    if (image_url) input.image = image_url;
+    if (cleanImageUrl) input.image = cleanImageUrl;
   } else if (model.includes('minimax')) {
     input.prompt_optimizer = true;
-    if (image_url) input.first_frame_image = image_url;
+    if (cleanImageUrl) input.first_frame_image = cleanImageUrl;
   } else if (model.includes('wan')) {
     // Wan 2.1 1.3b on Replicate strictly allows ONLY "480p"
     input.aspect_ratio = aspect_ratio || '16:9';
     input.resolution = '480p';
+    if (cleanImageUrl) input.image = cleanImageUrl;
   } else if (model.includes('kling')) {
     input.aspect_ratio = aspect_ratio || '16:9';
     if (duration) {
@@ -327,7 +331,7 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
         input.duration = Math.max(3, Math.min(15, parsedDur));
       }
     }
-    if (image_url) input.start_image = image_url;
+    if (cleanImageUrl) input.start_image = cleanImageUrl;
     input.generate_audio = generate_audio !== false;
     if (resolution === '1080p') {
       input.mode = 'pro';
@@ -336,7 +340,7 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
     }
     input.negative_prompt = 'blurry, low quality, distorted, deformed faces, bad anatomy, amateur, jittery, watermark, oversaturated';
   } else {
-    if (image_url) input.first_frame_image = image_url;
+    if (cleanImageUrl) input.first_frame_image = cleanImageUrl;
   }
 
   try {
