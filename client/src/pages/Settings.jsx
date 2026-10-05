@@ -144,53 +144,53 @@ export default function Settings() {
       <Topbar title="My Settings" />
 
       {/* Main Settings Panel */}
-      <div className="flex-grow overflow-y-auto p-6 md:p-8 flex flex-col md:flex-row gap-8 select-none">
+      <div className="flex-grow overflow-y-auto p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-5 md:gap-8 select-none">
         
         {/* Left Side Tab Navigation Drawer */}
-        <aside className="w-full md:w-48 shrink-0 flex flex-col space-y-1.5 pt-2">
+        <aside className="w-full md:w-48 shrink-0 flex flex-row md:flex-col overflow-x-auto pb-1 md:pb-0 gap-1.5 scrollbar-none pt-1 md:pt-2">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex items-center space-x-3.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+            className={`whitespace-nowrap shrink-0 flex items-center space-x-2.5 sm:space-x-3.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
               activeTab === 'profile' ? 'bg-primary text-white shadow-glow' : 'text-white/40 hover:text-white hover:bg-white/5'
             }`}
           >
-            <User className="w-4 h-4" />
+            <User className="w-4 h-4 shrink-0" />
             <span>Profile Details</span>
           </button>
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`flex items-center space-x-3.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+            className={`whitespace-nowrap shrink-0 flex items-center space-x-2.5 sm:space-x-3.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
               activeTab === 'security' ? 'bg-primary text-white shadow-glow' : 'text-white/40 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Shield className="w-4 h-4" />
+            <Shield className="w-4 h-4 shrink-0" />
             <span>Security</span>
           </button>
 
           <button
             onClick={() => setActiveTab('notifications')}
-            className={`flex items-center space-x-3.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+            className={`whitespace-nowrap shrink-0 flex items-center space-x-2.5 sm:space-x-3.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
               activeTab === 'notifications' ? 'bg-primary text-white shadow-glow' : 'text-white/40 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Bell className="w-4 h-4" />
+            <Bell className="w-4 h-4 shrink-0" />
             <span>Notifications</span>
           </button>
 
           <button
             onClick={() => setActiveTab('privacy')}
-            className={`flex items-center space-x-3.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+            className={`whitespace-nowrap shrink-0 flex items-center space-x-2.5 sm:space-x-3.5 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
               activeTab === 'privacy' ? 'bg-primary text-white shadow-glow' : 'text-white/40 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Lock className="w-4 h-4" />
+            <Lock className="w-4 h-4 shrink-0" />
             <span>Privacy & Deletion</span>
           </button>
         </aside>
 
         {/* Right Side Settings detail views */}
-        <section className="flex-grow max-w-xl bg-surface border border-white/5 rounded-2xl p-6 shadow-premium h-fit">
+        <section className="flex-grow max-w-xl bg-surface border border-white/5 rounded-2xl p-4 sm:p-6 shadow-premium h-fit">
           
           {/* PROFILE DETAILS TAB */}
           {activeTab === 'profile' && (

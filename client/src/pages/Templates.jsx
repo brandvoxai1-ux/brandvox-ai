@@ -69,17 +69,17 @@ export default function Templates() {
       <Topbar title="AI Creative Templates" />
 
       {/* Main Content Scroll Area */}
-      <div className="flex-grow overflow-y-auto p-6 md:p-8 space-y-6">
+      <div className="flex-grow overflow-y-auto p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
         
         {/* Banner Hero */}
-        <div className="relative rounded-2xl p-6 md:p-8 bg-gradient-to-r from-primary/20 via-purple-900/10 to-transparent border border-white/8 overflow-hidden select-none">
+        <div className="relative rounded-2xl p-4 sm:p-6 md:p-8 bg-gradient-to-r from-primary/20 via-purple-900/10 to-transparent border border-white/8 overflow-hidden select-none">
           <div className="absolute right-0 top-0 bottom-0 w-96 bg-primary/10 rounded-full blur-3xl -z-10 pointer-events-none" />
           <div className="max-w-2xl space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/15 border border-primary/25 text-primary-hover text-[10px] font-black uppercase tracking-widest">
               <Sparkles className="w-3.5 h-3.5 animate-pulse" />
               <span>Trending Social & E-Com Presets</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-white tracking-wide">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-wide">
               Launch Viral Videos & Ads in 1-Click
             </h1>
             <p className="text-xs md:text-sm text-white/50 leading-relaxed font-medium">
@@ -89,7 +89,7 @@ export default function Templates() {
         </div>
 
         {/* Filters and Search Toolbar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface border border-white/5 p-4 rounded-2xl select-none">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 bg-surface border border-white/5 p-3.5 sm:p-4 rounded-2xl select-none">
           {/* Category Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
             {TEMPLATE_CATEGORIES.map((cat) => (
@@ -108,9 +108,9 @@ export default function Templates() {
           </div>
 
           {/* Search bar + Media type filter */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
             {/* Media type toggle */}
-            <div className="flex bg-surface-elevated p-1 rounded-xl border border-white/5 text-[11px] font-bold">
+            <div className="flex bg-surface-elevated p-1 rounded-xl border border-white/5 text-[11px] font-bold overflow-x-auto scrollbar-none justify-between sm:justify-start">
               {[
                 { id: 'all', label: 'All' },
                 { id: 'video', label: 'Videos' },
@@ -120,7 +120,7 @@ export default function Templates() {
                 <button
                   key={id}
                   onClick={() => setSelectedMediaType(id)}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial text-center px-2.5 sm:px-3 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
                     selectedMediaType === id ? 'bg-primary text-white shadow-xs' : 'text-white/40 hover:text-white/70'
                   }`}
                 >
@@ -130,7 +130,7 @@ export default function Templates() {
             </div>
 
             {/* Search */}
-            <div className="relative min-w-[200px] md:min-w-[240px]">
+            <div className="relative w-full sm:min-w-[200px] md:min-w-[240px]">
               <Search className="w-3.5 h-3.5 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -151,7 +151,7 @@ export default function Templates() {
             <p className="text-xs text-white/40">Try selecting "All Templates" or clearing your search term.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {filteredTemplates.map((template) => (
               <div
                 key={template.id}
@@ -254,11 +254,11 @@ export default function Templates() {
 
       {/* QUICK-LAUNCH DETAIL MODAL */}
       {activeModalTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in select-none">
-          <div className="relative w-full max-w-2xl max-h-[90vh] bg-[#141414] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in select-none">
+          <div className="relative w-full max-w-2xl max-h-[90dvh] bg-[#141414] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
             
             {/* Modal Header */}
-            <div className="p-4 border-b border-white/8 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 border-b border-white/8 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-primary/20 text-primary-hover flex items-center justify-center font-bold">
                   <Sparkles className="w-3.5 h-3.5" />
@@ -279,7 +279,7 @@ export default function Templates() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-5">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-5">
               
               {/* Media Player */}
               <div className="relative aspect-video rounded-xl overflow-hidden bg-black border border-white/10">
@@ -318,7 +318,7 @@ export default function Templates() {
               </div>
 
               {/* Template Parameters Grid */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                 <div className="bg-surface-elevated p-2.5 rounded-xl border border-white/5 text-center">
                   <span className="text-[9px] text-white/40 uppercase font-black block">Recommended Model</span>
                   <span className="text-xs font-bold text-white mt-0.5 block">{activeModalTemplate.model_name}</span>
@@ -335,8 +335,8 @@ export default function Templates() {
             </div>
 
             {/* Modal Footer CTA */}
-            <div className="p-4 border-t border-white/8 bg-[#0D0D0D] flex items-center justify-between">
-              <span className="text-xs text-white/40">
+            <div className="p-3.5 sm:p-4 border-t border-white/8 bg-[#0D0D0D] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <span className="text-xs text-white/40 text-center sm:text-left">
                 Click customize to open this setup in the Studio
               </span>
               <Button
@@ -346,7 +346,7 @@ export default function Templates() {
                   setActiveModalTemplate(null);
                   handleUseTemplate(t);
                 }}
-                className="shadow-premium px-5"
+                className="shadow-premium px-5 w-full sm:w-auto"
               >
                 Customize in Studio ➔
               </Button>

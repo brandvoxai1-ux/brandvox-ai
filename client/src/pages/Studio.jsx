@@ -34,7 +34,8 @@ import {
   ShieldCheck,
   Video as VideoIcon,
   Volume2,
-  VolumeX
+  VolumeX,
+  SlidersHorizontal
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -68,6 +69,7 @@ export default function Studio() {
   const [imageUrl, setImageUrl] = useState(''); // Target character image or Image-to-Video source
   const [sourceVideoUrl, setSourceVideoUrl] = useState(''); // Character Swap source motion video
   const [remixImageUrl, setRemixImageUrl] = useState(''); // Image-to-Image remix reference photo
+  const [mobileControlsOpen, setMobileControlsOpen] = useState(false); // Mobile slide-up drawer
 
   // AI Prompt Enhancer state
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -175,28 +177,28 @@ export default function Studio() {
       if (r < 0.75) {
         // Vertical Portrait (9:16 Shorts / Reels / TikTok)
         return {
-          wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[58vh]',
+          wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
           aspectRatio: '9/16',
           label: '9:16 Portrait'
         };
       } else if (r >= 0.75 && r <= 1.25) {
         // Square (1:1 Feed / Square)
         return {
-          wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[58vh]',
+          wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
           aspectRatio: '1/1',
           label: '1:1 Square'
         };
       } else if (r > 1.25 && r <= 1.55) {
         // Standard (4:3)
         return {
-          wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[58vh]',
+          wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
           aspectRatio: '4/3',
           label: '4:3 Standard'
         };
       } else {
         // Widescreen Landscape (16:9)
         return {
-          wrapperClass: 'w-full max-w-xl aspect-video max-h-[58vh]',
+          wrapperClass: 'w-full max-w-xl aspect-video max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
           aspectRatio: '16/9',
           label: '16:9 Landscape'
         };
@@ -207,19 +209,19 @@ export default function Studio() {
     const targetAspect = activeVideo?.aspect_ratio || aspectRatio;
     if (targetAspect === '9:16') {
       return {
-        wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[58vh]',
+        wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
         aspectRatio: '9/16',
         label: '9:16 Portrait'
       };
     } else if (targetAspect === '1:1') {
       return {
-        wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[58vh]',
+        wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
         aspectRatio: '1/1',
         label: '1:1 Square'
       };
     } else if (targetAspect === '4:3') {
       return {
-        wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[58vh]',
+        wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
         aspectRatio: '4/3',
         label: '4:3 Standard'
       };
@@ -227,8 +229,8 @@ export default function Studio() {
 
     // Default 16:9 Landscape
     return {
-      wrapperClass: 'w-full max-w-xl aspect-video max-h-[58vh]',
-      aspectRatio: '16/9',
+      wrapperClass: 'w-full max-w-xl aspect-video max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
+      aspectRatio: '16:9',
       label: '16:9 Landscape'
     };
   };
@@ -589,13 +591,10 @@ export default function Studio() {
     return () => window.removeEventListener('keydown', handleShortcuts);
   }, [promptText, selectedModel, duration, resolution, aspectRatio, imageUrl, insufficientCredits]);
 
-  return (
-    <div className="flex flex-grow h-screen overflow-hidden bg-darkBg text-white">
-      
-      {/* PANEL 2: LEFT CONTROL PANEL (220px wide) */}
-      <aside className="hidden lg:flex flex-col w-56 bg-surface border-r border-white/5 p-4 overflow-y-auto shrink-0 select-none justify-between space-y-6 relative">
-        <div className="space-y-5">
-          {/* Top-level creator mode: Video | Swap (V2V) | Image */}
+  const renderControlPanelContent = (isMobile = false) => (
+    <>
+      <div className="space-y-5">
+        {/* Top-level creator mode: Video | Swap (V2V) | Image */}
           <div className="flex bg-surface-elevated p-0.5 rounded-lg border border-white/5 text-[9.5px] font-bold uppercase tracking-wider">
             {[
               { id: 'video', label: 'Video', icon: Film },
@@ -976,8 +975,6 @@ export default function Studio() {
             )}
           </div>
 
-        </div>
-
         {/* Dynamic Cost Estimator */}
         <div className="bg-surface-elevated p-3 rounded-xl border border-white/5 space-y-2">
           <div className="flex justify-between text-[10px] font-bold text-white/40 uppercase tracking-widest">
@@ -997,6 +994,52 @@ export default function Studio() {
             </p>
           )}
         </div>
+      </div>
+      {isMobile && (
+        <Button
+          variant="primary"
+          size="md"
+          className="w-full mt-4 py-2.5 font-bold uppercase text-xs tracking-wider"
+          onClick={() => setMobileControlsOpen(false)}
+        >
+          Done & View Canvas
+        </Button>
+      )}
+    </>
+  );
+
+  return (
+    <div className="flex flex-grow h-full max-h-[calc(100dvh-4rem)] md:max-h-screen overflow-hidden bg-darkBg text-white relative">
+      
+      {/* MOBILE CONTROL DRAWER (Slide-up sheet for < lg screens) */}
+      {mobileControlsOpen && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 z-45 bg-black/80 backdrop-blur-xs transition-opacity animate-fade-in"
+            onClick={() => setMobileControlsOpen(false)}
+          />
+          <div className="lg:hidden fixed bottom-16 left-0 right-0 max-h-[82dvh] bg-[#141416] border-t border-white/10 rounded-t-3xl p-5 overflow-y-auto z-50 shadow-2xl flex flex-col space-y-4 animate-fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-white/5 sticky top-0 bg-[#141416] z-10">
+              <div className="flex items-center space-x-2">
+                <SlidersHorizontal className="w-4 h-4 text-primary" />
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Studio Configuration</h3>
+              </div>
+              <button
+                onClick={() => setMobileControlsOpen(false)}
+                className="text-white/40 hover:text-white p-1 rounded-md transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
+            {renderControlPanelContent(true)}
+          </div>
+        </>
+      )}
+
+      {/* PANEL 2: DESKTOP LEFT CONTROL PANEL (220px wide) */}
+      <aside className="hidden lg:flex flex-col w-56 bg-surface border-r border-white/5 p-4 overflow-y-auto shrink-0 select-none justify-between space-y-6 relative">
+        {renderControlPanelContent(false)}
       </aside>
 
       {/* PANEL 3: MIDDLE CANVAS CONTAINER (Fills space) */}
@@ -1036,8 +1079,31 @@ export default function Studio() {
         />
 
         {/* Middle Canvas workspace area */}
-        <div className="flex-grow overflow-y-auto p-6 flex flex-col justify-between space-y-6">
+        <div className="flex-grow overflow-y-auto p-3 sm:p-6 flex flex-col justify-between space-y-3 sm:space-y-6">
           
+          {/* Mobile Studio Quick Status & Config Trigger Bar */}
+          <div className="lg:hidden flex items-center justify-between bg-surface-elevated/90 backdrop-blur-md px-3 py-2 rounded-xl border border-white/8 text-xs select-none shadow-sm">
+            <div className="flex items-center space-x-1.5 overflow-hidden">
+              <span className="px-2 py-0.5 rounded-md bg-primary/20 text-primary-hover font-black text-[9.5px] uppercase shrink-0">
+                {activeMode === 'swap' ? 'Swap' : activeMode === 'image' ? 'Image' : 'Video'}
+              </span>
+              <span className="font-bold text-white/90 text-xs truncate max-w-[130px]">
+                {selectedModel?.name || 'Model'}
+              </span>
+              <span className="text-[10px] text-white/40 font-mono shrink-0">
+                {aspectRatio}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileControlsOpen(true)}
+              className="flex items-center space-x-1 px-2.5 py-1 bg-white/10 hover:bg-white/15 text-white rounded-lg text-[10.5px] font-bold transition-all border border-white/10 shrink-0 cursor-pointer active:scale-95"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-primary-hover" />
+              <span>Model & Settings</span>
+            </button>
+          </div>
+
           {/* Active Canvas Tabs Panels */}
           <div className="flex-grow flex items-center justify-center">
             {activeCanvasTab === 'editor' && (
@@ -1265,11 +1331,11 @@ export default function Studio() {
           </div>
 
           {/* Core Prompt input tray (always visible on Panel 3 bottom) */}
-          <div className="w-full max-w-2xl mx-auto space-y-3 bg-surface border border-white/5 p-4 rounded-2xl select-none shadow-premium">
+          <div className="w-full max-w-2xl mx-auto space-y-2.5 sm:space-y-3 bg-surface border border-white/5 p-3 sm:p-4 rounded-xl sm:rounded-2xl select-none shadow-premium">
             
             {/* Quick Templates & Ad Styles Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
-              <div className="flex items-center space-x-1.5 overflow-x-auto pr-1">
+              <div className="flex items-center space-x-1.5 overflow-x-auto pr-1 scrollbar-none">
                 <span className="text-[9px] font-black uppercase text-primary-hover tracking-wider shrink-0 mr-1 flex items-center">
                   <Sparkles className="w-3 h-3 mr-1" />
                   Ad Style:
@@ -1321,17 +1387,17 @@ export default function Studio() {
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
                 maxLength="1500"
-                rows="3"
-                className="w-full bg-surface-elevated text-xs rounded-xl px-4 py-3 border border-white/10 focus:outline-none focus:border-primary text-white resize-none placeholder-white/20"
+                rows="2"
+                className="w-full bg-surface-elevated text-xs rounded-xl px-3.5 py-2.5 sm:py-3 border border-white/10 focus:outline-none focus:border-primary text-white resize-none placeholder-white/20"
               />
-              <span className="absolute bottom-3 right-3 text-[10px] font-bold text-white/25">
+              <span className="absolute bottom-2.5 right-3 text-[10px] font-bold text-white/25">
                 {promptText.length}/1500
               </span>
             </div>
             
             <div className="flex items-center justify-between text-[10px] text-white/40 font-semibold uppercase tracking-wider">
-              <span>💡 Tip: Click "🪄 Enhance for Ads" to add camera angles, 8k textures & cinematic lighting</span>
-              <span>Ctrl+Enter to compile</span>
+              <span className="truncate mr-2">💡 Tip: Click "🪄 Enhance for Ads" for viral commercial prompt</span>
+              <span className="hidden sm:inline shrink-0">Ctrl+Enter to compile</span>
             </div>
           </div>
         </div>

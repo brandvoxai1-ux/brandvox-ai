@@ -132,12 +132,12 @@ export default function Projects() {
       <Topbar title="My Creations" />
 
       {/* Main panel scroll container */}
-      <div className="flex-grow overflow-y-auto p-6 md:p-8 space-y-6">
+      <div className="flex-grow overflow-y-auto p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
         
         {/* Filters and Lookups Panel */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface border border-white/5 p-4 rounded-xl select-none">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-surface border border-white/5 p-3 sm:p-4 rounded-xl select-none">
           {/* Search bar */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative w-full md:max-w-md">
             <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 transform -translate-y-1/2" />
             <input
               type="text"
@@ -149,7 +149,7 @@ export default function Projects() {
           </div>
 
           {/* Configuration tools */}
-          <div className="flex items-center space-x-3.5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
             {/* Status filters */}
             <div className="flex items-center space-x-1.5 text-xs text-white/50">
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -226,7 +226,7 @@ export default function Projects() {
         ) : viewMode === 'grid' ? (
           /* Grid View Mode */
           <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredVideos.map((video) => (
                 <VideoCard
                   key={video.id}

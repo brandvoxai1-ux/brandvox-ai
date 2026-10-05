@@ -82,64 +82,65 @@ export default function MediaModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/85 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-4xl bg-[#141414] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]"
+        className="relative w-full max-w-4xl bg-[#141414] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92dvh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top bar header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-surface/50">
-          <div className="flex items-center space-x-3 truncate mr-4">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary-hover">
+        <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 border-b border-white/5 bg-surface/50">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 truncate mr-2 sm:mr-4">
+            <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10 text-primary-hover shrink-0">
               {isImage ? <ImageIcon className="w-4 h-4" /> : <Film className="w-4 h-4" />}
             </div>
             <div className="truncate">
-              <h3 className="text-sm font-extrabold text-white truncate tracking-wide">
+              <h3 className="text-xs sm:text-sm font-extrabold text-white truncate tracking-wide">
                 {media.title || 'Untitled Creation'}
               </h3>
-              <p className="text-[10px] text-white/40 font-semibold uppercase tracking-wider">
+              <p className="text-[9px] sm:text-[10px] text-white/40 font-semibold uppercase tracking-wider">
                 {formatDate(media.created_at)}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 shrink-0">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
             {media.prompt && (
               <button
                 onClick={handleRemix}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10"
+                className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10"
                 title="Open in Studio to generate variations"
               >
-                <Wand2 className="w-3.5 h-3.5 text-primary" />
-                <span>Remix in Studio</span>
+                <Wand2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="hidden sm:inline">Remix in Studio</span>
+                <span className="sm:hidden">Remix</span>
               </button>
             )}
             <button
               onClick={handleDownload}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all shadow-premium"
+              className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all shadow-premium"
               title="Download asset"
             >
-              {watermarkRequired ? <Crown className="w-3.5 h-3.5 text-warning" /> : <Download className="w-3.5 h-3.5" />}
-              <span>Download</span>
+              {watermarkRequired ? <Crown className="w-3.5 h-3.5 text-warning shrink-0" /> : <Download className="w-3.5 h-3.5 shrink-0" />}
+              <span className="hidden xs:inline">Download</span>
             </button>
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-white/60 hover:text-white transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
 
         {/* Media Preview Box */}
-        <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[300px] max-h-[58vh]">
+        <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[220px] sm:min-h-[300px] max-h-[46vh] sm:max-h-[58vh]">
           {isImage ? (
             <img
               src={media.video_url}
               alt={media.title || 'AI Generated Art'}
-              className="max-h-[58vh] w-auto max-w-full object-contain select-none"
+              className="max-h-[46vh] sm:max-h-[58vh] w-auto max-w-full object-contain select-none"
             />
           ) : (
             <video
@@ -148,7 +149,7 @@ export default function MediaModal({
               autoPlay
               playsInline
               loop
-              className="max-h-[58vh] w-auto max-w-full object-contain bg-black"
+              className="max-h-[46vh] sm:max-h-[58vh] w-auto max-w-full object-contain bg-black"
             />
           )}
 
@@ -160,7 +161,7 @@ export default function MediaModal({
         </div>
 
         {/* Details & Prompt Panel */}
-        <div className="p-6 bg-[#161616] border-t border-white/5 space-y-4">
+        <div className="p-4 sm:p-6 bg-[#161616] border-t border-white/5 space-y-3 sm:space-y-4">
           {/* Prompt card */}
           {media.prompt && (
             <div className="relative p-3.5 rounded-xl bg-surface border border-white/5">

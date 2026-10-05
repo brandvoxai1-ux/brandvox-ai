@@ -201,7 +201,7 @@ export default function Sidebar({ toggleNotifications }) {
       </aside>
 
       {/* MOBILE BOTTOM NAVIGATION BAR (collapses, visible on < md screens) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface border-t border-white/5 flex items-center justify-around px-4 z-40 glass">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface/95 backdrop-blur-md border-t border-white/5 flex items-center justify-around px-1 z-40 pb-[env(safe-area-inset-bottom)] select-none">
         {menuItems.slice(0, 5).map((item) => {
           const Icon = item.icon;
           const active = isActive(item);
@@ -209,7 +209,7 @@ export default function Sidebar({ toggleNotifications }) {
             <button
               key={item.id}
               onClick={() => handleNav(item)}
-              className={`relative flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 ${
+              className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
                 active ? 'text-primary' : 'text-white/40 hover:text-white'
               }`}
             >

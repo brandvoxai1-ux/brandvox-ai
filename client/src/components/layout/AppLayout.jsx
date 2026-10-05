@@ -64,12 +64,12 @@ export default function AppLayout({ children }) {
   };
 
   return (
-    <div className="flex w-screen h-screen bg-darkBg text-white overflow-hidden">
+    <div className="flex w-screen h-[100dvh] bg-darkBg text-white overflow-hidden">
       {/* 64px width Sidebar */}
       <Sidebar toggleNotifications={handleToggle} />
 
       {/* Main Page Content panel */}
-      <main className="flex flex-col flex-grow h-screen overflow-hidden pb-16 md:pb-0 relative">
+      <main className="flex flex-col flex-grow h-[100dvh] overflow-hidden pb-16 md:pb-0 relative">
         {children}
 
         {/* Right slide-in notification drawer */}

@@ -119,7 +119,7 @@ export default function Credits() {
     <div className="flex flex-col flex-grow h-full bg-darkBg text-white overflow-hidden">
       <Topbar title="Credits & Billing" />
 
-      <div className="flex-grow overflow-y-auto p-6 md:p-8 space-y-8 select-none">
+      <div className="flex-grow overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 sm:space-y-8 select-none">
         
         {/* Warning banner */}
         <div className="bg-amber-500/10 border border-amber-500/25 px-4 py-3.5 rounded-xl flex items-start space-x-3 text-amber-200">
@@ -133,12 +133,12 @@ export default function Credits() {
         </div>
 
         {/* TOP ROW: Balance Indicator Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-surface border border-white/5 p-6 rounded-xl space-y-4 flex flex-col justify-between shadow-premium relative overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          <div className="bg-surface border border-white/5 p-4 sm:p-6 rounded-xl space-y-4 flex flex-col justify-between shadow-premium relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-2xl" />
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Circulating Balance</span>
-              <h3 className="text-3xl font-black text-warning tracking-wide">
+              <h3 className="text-2xl sm:text-3xl font-black text-warning tracking-wide">
                 {formatCredits(profile?.credits || 0)}
               </h3>
             </div>
@@ -148,10 +148,10 @@ export default function Credits() {
             </div>
           </div>
 
-          <div className="bg-surface border border-white/5 p-6 rounded-xl space-y-4 flex flex-col justify-between shadow-premium">
+          <div className="bg-surface border border-white/5 p-4 sm:p-6 rounded-xl space-y-4 flex flex-col justify-between shadow-premium">
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Total Videos Compiled</span>
-              <h3 className="text-3xl font-black text-white tracking-wide">
+              <h3 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
                 {profile?.total_videos || 0}
               </h3>
             </div>
@@ -161,10 +161,10 @@ export default function Credits() {
             </div>
           </div>
 
-          <div className="bg-surface border border-white/5 p-6 rounded-xl space-y-4 flex flex-col justify-between shadow-premium">
+          <div className="bg-surface border border-white/5 p-4 sm:p-6 rounded-xl space-y-4 flex flex-col justify-between shadow-premium">
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Total Capital Spent</span>
-              <h3 className="text-3xl font-black text-primary-hover tracking-wide">
+              <h3 className="text-2xl sm:text-3xl font-black text-primary-hover tracking-wide">
                 {formatCredits(profile?.total_spent || 0)}
               </h3>
             </div>
@@ -178,7 +178,7 @@ export default function Credits() {
         {/* MIDDLE: Purchase Credit Packs Grid */}
         <div className="space-y-4">
           <h2 className="text-sm font-extrabold text-white uppercase tracking-widest">Buy Credits Package (UPI Only)</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {packages.map((pack) => (
               <div
                 key={pack.id}
@@ -343,34 +343,34 @@ export default function Credits() {
 
       {/* Simplified premium UPI checkout Modal matching the user's wireframe */}
       {isModalOpen && selectedPack && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md transition-all duration-300 animate-fadeIn">
-          <div className="bg-[#0F0A1E] border border-purple-500/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative p-6 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md transition-all duration-300 animate-fadeIn">
+          <div className="bg-[#0F0A1E] border border-purple-500/10 rounded-3xl w-full max-w-md max-h-[90dvh] overflow-y-auto shadow-2xl relative p-4 sm:p-6 space-y-4 sm:space-y-6">
             
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <div className="flex-grow text-center">
-                <h3 className="text-base font-black uppercase text-white tracking-widest">Pay Using UPI</h3>
+            <div className="flex items-center justify-between border-b border-white/5 pb-3 sm:pb-4">
+              <div className="flex-grow text-center pr-6">
+                <h3 className="text-sm sm:text-base font-black uppercase text-white tracking-widest">Pay Using UPI</h3>
                 <span className="text-[9px] font-extrabold uppercase text-purple-300/80 tracking-widest block mt-0.5">
                   {selectedPack.name} — ₹{selectedPack.price} ({formatCredits(selectedPack.credits)})
                 </span>
               </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="absolute right-4 top-4 text-white/40 hover:text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-lg transition-all"
+                className="absolute right-3 sm:right-4 top-3 sm:top-4 text-white/40 hover:text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-lg transition-all"
               >
                 Close
               </button>
             </div>
 
             {/* Content Form */}
-            <form onSubmit={handleSubmitVerification} className="space-y-6">
+            <form onSubmit={handleSubmitVerification} className="space-y-4 sm:space-y-6">
               
               {/* Centered Large QR Code */}
               <div className="flex justify-center">
-                <div className="bg-white p-4 rounded-3xl shadow-premium flex items-center justify-center relative overflow-hidden group select-none border-4 border-purple-500/20">
+                <div className="bg-white p-3 sm:p-4 rounded-3xl shadow-premium flex items-center justify-center relative overflow-hidden group select-none border-4 border-purple-500/20">
                   <QRCode
                     value={`upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${selectedPack?.price || ''}&tn=${encodeURIComponent(generatedRef)}&cu=INR`}
-                    size={144}
+                    size={136}
                     level="H"
                     includeMargin={false}
                   />
@@ -378,14 +378,14 @@ export default function Credits() {
               </div>
 
               {/* Centered Client's UPI ID and Copy Button */}
-              <div className="flex flex-col items-center space-y-2.5">
-                <div className="flex items-center space-x-2 bg-white/5 px-4 py-2.5 rounded-2xl border border-white/5">
-                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Client's UPI ID:</span>
-                  <span className="font-mono text-sm font-black text-warning tracking-wide select-all">{UPI_ID}</span>
+              <div className="flex flex-col items-center space-y-2 sm:space-y-2.5 w-full">
+                <div className="flex items-center justify-between w-full max-w-sm space-x-2 bg-white/5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-white/5">
+                  <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest shrink-0">Client's UPI ID:</span>
+                  <span className="font-mono text-xs sm:text-sm font-black text-warning tracking-wide select-all truncate">{UPI_ID}</span>
                   <button
                     type="button"
                     onClick={handleCopyUpi}
-                    className="p-1.5 hover:bg-white/10 text-white/60 hover:text-white rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 hover:bg-white/10 text-white/60 hover:text-white rounded-lg transition-colors cursor-pointer shrink-0"
                     title="Copy UPI ID"
                   >
                     <Clipboard className="w-3.5 h-3.5" />
@@ -393,16 +393,16 @@ export default function Credits() {
                 </div>
 
                 {/* Mandated note for matching ledgers */}
-                <div className="flex items-center space-x-2 bg-purple-950/20 px-4 py-2.5 rounded-2xl border border-purple-500/10">
-                  <span className="text-[10px] font-bold text-purple-300/60 uppercase tracking-widest">Payment Note:</span>
-                  <span className="font-mono text-sm font-black text-purple-300 tracking-wider select-all">{generatedRef}</span>
+                <div className="flex items-center justify-between w-full max-w-sm space-x-2 bg-purple-950/20 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-purple-500/10">
+                  <span className="text-[10px] font-bold text-purple-300/60 uppercase tracking-widest shrink-0">Payment Note:</span>
+                  <span className="font-mono text-xs sm:text-sm font-black text-purple-300 tracking-wider select-all truncate">{generatedRef}</span>
                   <button
                     type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(generatedRef);
                       toast.success('Payment note copied!');
                     }}
-                    className="p-1.5 hover:bg-white/10 text-purple-300/60 hover:text-purple-300 rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 hover:bg-white/10 text-purple-300/60 hover:text-purple-300 rounded-lg transition-colors cursor-pointer shrink-0"
                     title="Copy Note"
                   >
                     <Clipboard className="w-3.5 h-3.5" />
@@ -419,7 +419,7 @@ export default function Credits() {
               </p>
 
               {/* Large premium Centered "Pay" button */}
-              <div className="flex justify-center pt-2">
+              <div className="flex justify-center pt-1 sm:pt-2">
                 <Button
                   type="submit"
                   isLoading={submitting}
