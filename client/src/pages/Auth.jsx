@@ -25,7 +25,7 @@ export default function Auth() {
   // Redirect if session is already active
   useEffect(() => {
     if (user) {
-      navigate('/studio');
+      navigate('/explore');
     }
   }, [user, navigate]);
 
@@ -47,7 +47,7 @@ export default function Auth() {
         }
         await login(email, password);
         toast.success('Welcome back to BrandVox AI!');
-        navigate('/studio');
+        navigate('/explore');
       } else if (mode === 'signup') {
         if (!email || !password || !fullName) {
           throw new Error('All signup fields are required.');
@@ -63,7 +63,7 @@ export default function Auth() {
         }
         await signUp(email, password, fullName);
         toast.success('Registration complete! Welcome to BrandVox AI (50 🪙 credited).');
-        navigate('/studio');
+        navigate('/explore');
       } else if (mode === 'forgot') {
         if (!email) {
           throw new Error('Please enter your email address to receive a reset link.');

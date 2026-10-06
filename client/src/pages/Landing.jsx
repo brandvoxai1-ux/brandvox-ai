@@ -1,6 +1,6 @@
-// client/src/pages/Landing.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import {
   Film,
   Sparkles,
@@ -21,6 +21,7 @@ import { Badge } from '../components/ui/Badge';
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null); // 'about' | 'support' | 'privacy' | 'terms' | null
 
@@ -77,11 +78,11 @@ export default function Landing() {
 
         {/* Right side checkouts */}
         <div className="hidden md:flex items-center space-x-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
-            Sign In
+          <Button variant="ghost" size="sm" onClick={() => navigate(user ? '/explore' : '/auth')}>
+            {user ? 'Dashboard' : 'Sign In'}
           </Button>
-          <Button variant="primary" size="sm" onClick={() => navigate('/auth')} className="shadow-premium">
-            Start Free (50 🪙)
+          <Button variant="primary" size="sm" onClick={() => navigate(user ? '/explore' : '/auth')} className="shadow-premium">
+            {user ? 'Explore Gallery' : 'Start Free (50 🪙)'}
           </Button>
         </div>
 
@@ -102,11 +103,11 @@ export default function Landing() {
           <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-white/70 text-sm font-bold">Pricing</a>
           <span onClick={() => { setMobileMenuOpen(false); navigate('/explore'); }} className="text-white/70 text-sm font-bold cursor-pointer">Explore</span>
           <div className="flex flex-col space-y-2 pt-4 border-t border-white/5">
-            <Button variant="secondary" onClick={() => { setMobileMenuOpen(false); navigate('/auth'); }}>
-              Sign In
+            <Button variant="secondary" onClick={() => { setMobileMenuOpen(false); navigate(user ? '/explore' : '/auth'); }}>
+              {user ? 'Dashboard' : 'Sign In'}
             </Button>
-            <Button variant="primary" onClick={() => { setMobileMenuOpen(false); navigate('/auth'); }}>
-              Start Free (50 🪙)
+            <Button variant="primary" onClick={() => { setMobileMenuOpen(false); navigate(user ? '/explore' : '/auth'); }}>
+              {user ? 'Explore Gallery' : 'Start Free (50 🪙)'}
             </Button>
           </div>
         </div>
@@ -133,7 +134,7 @@ export default function Landing() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center space-y-3.5 sm:space-y-0 sm:space-x-4 mb-14">
-          <Button variant="primary" size="lg" onClick={() => navigate('/auth')} className="w-full sm:w-auto shadow-premium">
+          <Button variant="primary" size="lg" onClick={() => navigate(user ? '/explore' : '/auth')} className="w-full sm:w-auto shadow-premium">
             <span>Start Creating Free</span>
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>

@@ -1,5 +1,4 @@
-// client/src/components/shared/VideoUploader.jsx
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, Video as VideoIcon, Loader2, ShieldCheck } from 'lucide-react';
 import api from '../../lib/api';
 import toast from 'react-hot-toast';
@@ -15,6 +14,10 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
   const [preview, setPreview] = useState(value || null);
   const [fileName, setFileName] = useState('');
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    setPreview(value || null);
+  }, [value]);
 
   const handleFile = useCallback(async (file) => {
     if (!file) return;

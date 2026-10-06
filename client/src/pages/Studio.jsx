@@ -148,26 +148,33 @@ export default function Studio() {
           setRemixImageUrl(media.video_url);
         }
       } else {
-        // Video mode
-        if (media.generation_type === 'swap') {
-          setActiveMode('swap');
-        } else {
-          setActiveMode('video');
-        }
+        // Video mode -> Directly activate Character Swap mode as requested!
+        setActiveMode('swap');
         if (media.video_url) {
           // Open the public reel directly in the Studio canvas player
           setActiveVideo(media);
-          // Also pre-populate the Character Swap motion reference so user can swap without uploading to backend
+          // Set as Step 1: Source Video so user only needs to upload character image in Step 2!
           setSourceVideoUrl(media.video_url);
         }
       }
 
-      if (modelVal && models.length > 0) {
-        const found = models.find(m => m.id === modelVal || m.fal_endpoint === modelVal || m.name === modelVal);
-        if (found) setSelectedModel(found);
+      if (isImg) {
+        if (modelVal && models.length > 0) {
+          const found = models.find(m => m.id === modelVal || m.fal_endpoint === modelVal || m.name === modelVal);
+          if (found) setSelectedModel(found);
+        }
+      } else {
+        if (models.length > 0) {
+          const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
+          const found = videoModels.find(m => m.id === modelVal && ['kling-3-omni', 'seedance-2'].includes(m.id)) ||
+                        videoModels.find(m => m.id === 'kling-3-omni') || 
+                        videoModels.find(m => m.id === 'seedance-2') || 
+                        videoModels[0];
+          if (found) setSelectedModel(found);
+        }
       }
 
-      toast.success(`✨ Opened "${media.title || 'Reel'}" in Studio for Remix!`, { icon: '🎬' });
+      toast.success(`✨ "${media.title || 'Reel'}" loaded in Character Swap! Upload character in Step 2.`, { icon: '🎭', duration: 4500 });
       window.history.replaceState({}, document.title);
     }
   }, [location.state, models]);

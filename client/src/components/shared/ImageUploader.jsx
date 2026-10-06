@@ -1,5 +1,5 @@
 // client/src/components/shared/ImageUploader.jsx
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import api from '../../lib/api';
 import toast from 'react-hot-toast';
@@ -87,6 +87,10 @@ export default function ImageUploader({ value, onUrlReady, onClear, onDimensions
   const [preview, setPreview] = useState(value || null);
   const [fileName, setFileName] = useState('');
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    setPreview(value || null);
+  }, [value]);
 
   const handleFile = useCallback(async (file) => {
     if (!file) return;
