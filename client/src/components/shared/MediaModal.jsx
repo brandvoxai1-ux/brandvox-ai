@@ -68,20 +68,21 @@ export default function MediaModal({
 
   const handleRemix = () => {
     onClose();
-    navigate('/studio', {
+    const isImage = media.generation_type === 'image' || (media.video_url && /\.(jpg|jpeg|png|webp)($|\?)/i.test(media.video_url));
+    const targetMode = isImage ? 'image' : 'swap';
+    navigate(`/studio?mode=${targetMode}`, {
       state: {
         remixMedia: media,
         prompt: media.prompt || '',
         remixPrompt: media.prompt || '',
         title: media.title ? `Remix: ${media.title}` : 'Remix Creation',
-        model: media.model_id || media.model_name || 'kling-3-omni',
+        model: isImage ? (media.model_id || 'ideogram-v2') : (['kling-3-omni', 'seedance-2'].includes(media.model_id) ? media.model_id : 'kling-3-omni'),
         model_id: media.model_id,
         aspectRatio: media.aspect_ratio || '16:9',
         duration: media.duration ? String(media.duration) : '5',
-        mediaType: media.generation_type || (/\.(jpg|jpeg|png|webp)($|\?)/i.test(media.video_url) ? 'image' : 'video')
+        mediaType: targetMode
       }
     });
-    toast.success('Loaded creation into Studio for remixing!');
   };
 
   return (

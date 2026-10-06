@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -21,9 +21,16 @@ import { Badge } from '../components/ui/Badge';
 
 export default function Landing() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeModal, setActiveModal] = useState(null); // 'about' | 'support' | 'privacy' | 'terms' | null
+
+  // Auto-redirect authenticated users directly to explore gallery
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/explore');
+    }
+  }, [user, loading, navigate]);
 
   const features = [
     { icon: Film, title: 'Multi-Model Studio', desc: 'Seamlessly switch between MiniMax Hailuo, Kling Video, Wan 2.5, and Ideogram.' },

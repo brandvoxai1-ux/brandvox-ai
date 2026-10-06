@@ -53,12 +53,23 @@ export default function Studio() {
     updateGeneration
   } = useGeneration();
 
-  // Left panel states
-  const [activeMode, setActiveMode] = useState('video'); // 'video' | 'swap' | 'image'
+  // Left panel states — Synchronously initialize from location.state or query param to prevent mode flash
+  const [activeMode, setActiveMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paramMode = params.get('mode');
+    if (paramMode && ['video', 'swap', 'image'].includes(paramMode)) return paramMode;
+    if (location.state?.remixMedia || location.state?.mediaType === 'swap') return 'swap';
+    if (location.state?.template?.media_type) return location.state.template.media_type;
+    return 'video';
+  });
   const [selectedModel, setSelectedModel] = useState(null);
   const [resolution, setResolution] = useState('720p');
-  const [aspectRatio, setAspectRatio] = useState('16:9');
-  const [duration, setDuration] = useState(6);
+  const [aspectRatio, setAspectRatio] = useState(() => {
+    return location.state?.remixMedia?.aspect_ratio || location.state?.template?.aspect_ratio || '16:9';
+  });
+  const [duration, setDuration] = useState(() => {
+    return Number(location.state?.remixMedia?.duration || location.state?.template?.duration) || 6;
+  });
   const [generateAudio, setGenerateAudio] = useState(true);
   const [mediaDimensions, setMediaDimensions] = useState(null); // { width, height, ratio }
   const [isVideoMuted, setIsVideoMuted] = useState(false);
@@ -67,8 +78,15 @@ export default function Studio() {
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const modelPickerRef = useRef(null);
   const [imageUrl, setImageUrl] = useState(''); // Target character image or Image-to-Video source
-  const [sourceVideoUrl, setSourceVideoUrl] = useState(''); // Character Swap source motion video
-  const [remixImageUrl, setRemixImageUrl] = useState(''); // Image-to-Image remix reference photo
+  const [sourceVideoUrl, setSourceVideoUrl] = useState(() => {
+    return location.state?.remixMedia?.video_url || '';
+  }); // Character Swap source motion video
+  const [remixImageUrl, setRemixImageUrl] = useState(() => {
+    if (location.state?.mediaType === 'image' || location.state?.remixMedia?.generation_type === 'image') {
+      return location.state?.remixMedia?.video_url || '';
+    }
+    return '';
+  }); // Image-to-Image remix reference photo
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false); // Mobile slide-up drawer
 
   // AI Prompt Enhancer state
@@ -76,7 +94,11 @@ export default function Studio() {
   const [adStyle, setAdStyle] = useState('ad-commercial');
 
   // Topbar and Canvas state
-  const [projectTitle, setProjectTitle] = useState('My BrandVox Reel');
+  const [projectTitle, setProjectTitle] = useState(() => {
+    if (location.state?.remixMedia?.title) return `Remix: ${location.state.remixMedia.title}`;
+    if (location.state?.template?.title) return location.state.template.title;
+    return 'My BrandVox Reel';
+  });
   const [activeCanvasTab, setActiveCanvasTab] = useState('editor'); // 'editor' | 'queue' | 'history'
 
   // Close model picker on outside click
@@ -91,21 +113,30 @@ export default function Studio() {
   }, []);
 
   // Prompt Area state
-  const [promptText, setPromptText] = useState('');
+  const [promptText, setPromptText] = useState(() => {
+    return location.state?.remixMedia?.prompt || location.state?.template?.prompt || location.state?.remixPrompt || location.state?.prompt || '';
+  });
   const promptRef = useRef(null);
 
   // Active playing video (Editor Canvas)
-  const [activeVideo, setActiveVideo] = useState(null);
+  const [activeVideo, setActiveVideo] = useState(() => {
+    return location.state?.remixMedia || null;
+  });
   
   // Active image generation result (image mode)
-  const [activeImageUrl, setActiveImageUrl] = useState(null);
+  const [activeImageUrl, setActiveImageUrl] = useState(() => {
+    if (location.state?.mediaType === 'image' || location.state?.remixMedia?.generation_type === 'image') {
+      return location.state?.remixMedia?.video_url || null;
+    }
+    return null;
+  });
   const [imageGenerating, setImageGenerating] = useState(false);
   const [activeGenerationId, setActiveGenerationId] = useState(null);
   const [failedGenId, setFailedGenId] = useState(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState('idle'); // 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
   const [generationError, setGenerationError] = useState('');
-  const hasLoadedRemixRef = useRef(false);
+  const hasLoadedRemixRef = useRef(Boolean(location.state?.remixMedia));
 
   // Handle incoming template or remix data from Navigation (Templates or Explore pages)
   useEffect(() => {
@@ -121,14 +152,14 @@ export default function Studio() {
         if (found) setSelectedModel(found);
       }
       toast.success(`✨ Loaded template: "${tpl.title || 'Creative Preset'}"`);
-      window.history.replaceState({}, document.title);
+      window.history.replaceState({}, document.title, window.location.pathname);
     } else if (location.state?.remixMedia || location.state?.remixPrompt || location.state?.prompt) {
       hasLoadedRemixRef.current = true;
       const media = location.state.remixMedia || {};
       const prompt = media.prompt || location.state.remixPrompt || location.state.prompt || '';
       const title = location.state.title || (media.title ? `Remix: ${media.title}` : 'Remix Creation');
-      const aspect = media.aspect_ratio || location.state.aspectRatio;
-      const dur = media.duration || location.state.duration;
+      const aspect = media.aspect_ratio || location.state.aspectRatio || '16:9';
+      const dur = media.duration || location.state.duration || 6;
       const modelVal = location.state.model_id || location.state.model || media.model_id || media.model_name;
       const isImg = media.generation_type === 'image' || 
                     location.state.mediaType === 'image' || 
@@ -147,23 +178,17 @@ export default function Studio() {
           setActiveImageUrl(media.video_url);
           setRemixImageUrl(media.video_url);
         }
-      } else {
-        // Video mode -> Directly activate Character Swap mode as requested!
-        setActiveMode('swap');
-        if (media.video_url) {
-          // Open the public reel directly in the Studio canvas player
-          setActiveVideo(media);
-          // Set as Step 1: Source Video so user only needs to upload character image in Step 2!
-          setSourceVideoUrl(media.video_url);
-        }
-      }
-
-      if (isImg) {
         if (modelVal && models.length > 0) {
           const found = models.find(m => m.id === modelVal || m.fal_endpoint === modelVal || m.name === modelVal);
           if (found) setSelectedModel(found);
         }
       } else {
+        // Video mode -> Directly activate Character Swap mode
+        setActiveMode('swap');
+        if (media.video_url) {
+          setActiveVideo(media);
+          setSourceVideoUrl(media.video_url);
+        }
         if (models.length > 0) {
           const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
           const found = videoModels.find(m => m.id === modelVal && ['kling-3-omni', 'seedance-2'].includes(m.id)) ||
@@ -172,10 +197,10 @@ export default function Studio() {
                         videoModels[0];
           if (found) setSelectedModel(found);
         }
+        toast.success(`✨ "${media.title || 'Reel'}" loaded in Character Swap! Upload character in Step 2.`, { icon: '🎭', duration: 4500 });
       }
 
-      toast.success(`✨ "${media.title || 'Reel'}" loaded in Character Swap! Upload character in Step 2.`, { icon: '🎭', duration: 4500 });
-      window.history.replaceState({}, document.title);
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [location.state, models]);
   
