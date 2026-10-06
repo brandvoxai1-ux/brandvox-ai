@@ -70,11 +70,15 @@ export default function MediaModal({
     onClose();
     navigate('/studio', {
       state: {
+        remixMedia: media,
         prompt: media.prompt || '',
+        remixPrompt: media.prompt || '',
         title: media.title ? `Remix: ${media.title}` : 'Remix Creation',
-        model: media.model_name || 'kling-3-omni',
+        model: media.model_id || media.model_name || 'kling-3-omni',
+        model_id: media.model_id,
         aspectRatio: media.aspect_ratio || '16:9',
-        duration: media.duration ? String(media.duration) : '5'
+        duration: media.duration ? String(media.duration) : '5',
+        mediaType: media.generation_type || (/\.(jpg|jpeg|png|webp)($|\?)/i.test(media.video_url) ? 'image' : 'video')
       }
     });
     toast.success('Loaded creation into Studio for remixing!');
@@ -106,7 +110,7 @@ export default function MediaModal({
           </div>
 
           <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-            {media.prompt && (
+            {(media.prompt || media.video_url) && (
               <button
                 onClick={handleRemix}
                 className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10"

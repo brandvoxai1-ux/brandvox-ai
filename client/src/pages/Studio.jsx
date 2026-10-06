@@ -94,6 +94,19 @@ export default function Studio() {
   const [promptText, setPromptText] = useState('');
   const promptRef = useRef(null);
 
+  // Active playing video (Editor Canvas)
+  const [activeVideo, setActiveVideo] = useState(null);
+  
+  // Active image generation result (image mode)
+  const [activeImageUrl, setActiveImageUrl] = useState(null);
+  const [imageGenerating, setImageGenerating] = useState(false);
+  const [activeGenerationId, setActiveGenerationId] = useState(null);
+  const [failedGenId, setFailedGenId] = useState(null);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStatus, setGenerationStatus] = useState('idle'); // 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
+  const [generationError, setGenerationError] = useState('');
+  const hasLoadedRemixRef = useRef(false);
+
   // Handle incoming template or remix data from Navigation (Templates or Explore pages)
   useEffect(() => {
     if (location.state?.template) {
@@ -109,29 +122,55 @@ export default function Studio() {
       }
       toast.success(`✨ Loaded template: "${tpl.title || 'Creative Preset'}"`);
       window.history.replaceState({}, document.title);
-    } else if (location.state?.remixPrompt) {
-      setPromptText(location.state.remixPrompt);
-      if (location.state.model_id && models.length > 0) {
-        const found = models.find(m => m.id === location.state.model_id);
+    } else if (location.state?.remixMedia || location.state?.remixPrompt || location.state?.prompt) {
+      hasLoadedRemixRef.current = true;
+      const media = location.state.remixMedia || {};
+      const prompt = media.prompt || location.state.remixPrompt || location.state.prompt || '';
+      const title = location.state.title || (media.title ? `Remix: ${media.title}` : 'Remix Creation');
+      const aspect = media.aspect_ratio || location.state.aspectRatio;
+      const dur = media.duration || location.state.duration;
+      const modelVal = location.state.model_id || location.state.model || media.model_id || media.model_name;
+      const isImg = media.generation_type === 'image' || 
+                    location.state.mediaType === 'image' || 
+                    (media.video_url && /\.(jpg|jpeg|png|webp)($|\?)/i.test(media.video_url));
+
+      if (prompt) setPromptText(prompt);
+      if (title) setProjectTitle(title);
+      if (aspect) setAspectRatio(aspect);
+      if (dur) setDuration(Number(dur) || 6);
+
+      setActiveCanvasTab('editor');
+
+      if (isImg) {
+        setActiveMode('image');
+        if (media.video_url) {
+          setActiveImageUrl(media.video_url);
+          setRemixImageUrl(media.video_url);
+        }
+      } else {
+        // Video mode
+        if (media.generation_type === 'swap') {
+          setActiveMode('swap');
+        } else {
+          setActiveMode('video');
+        }
+        if (media.video_url) {
+          // Open the public reel directly in the Studio canvas player
+          setActiveVideo(media);
+          // Also pre-populate the Character Swap motion reference so user can swap without uploading to backend
+          setSourceVideoUrl(media.video_url);
+        }
+      }
+
+      if (modelVal && models.length > 0) {
+        const found = models.find(m => m.id === modelVal || m.fal_endpoint === modelVal || m.name === modelVal);
         if (found) setSelectedModel(found);
       }
-      if (location.state.media_type) setActiveMode(location.state.media_type);
-      toast.success('Prompt loaded into Studio!', { icon: '🎨' });
+
+      toast.success(`✨ Opened "${media.title || 'Reel'}" in Studio for Remix!`, { icon: '🎬' });
       window.history.replaceState({}, document.title);
     }
   }, [location.state, models]);
-
-  // Active playing video (Editor Canvas)
-  const [activeVideo, setActiveVideo] = useState(null);
-  
-  // Active image generation result (image mode)
-  const [activeImageUrl, setActiveImageUrl] = useState(null);
-  const [imageGenerating, setImageGenerating] = useState(false);
-  const [activeGenerationId, setActiveGenerationId] = useState(null);
-  const [failedGenId, setFailedGenId] = useState(null);
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [generationStatus, setGenerationStatus] = useState('idle'); // 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
-  const [generationError, setGenerationError] = useState('');
   
   // Lists
   const [recentVideos, setRecentVideos] = useState([]);
@@ -280,8 +319,8 @@ export default function Studio() {
       const completed = allVideos.filter(v => v.status === 'completed');
       setRecentVideos(completed.slice(0, 5));
 
-      // Auto-load most recent completed video in Editor if idle
-      if (completed.length > 0 && !activeVideo && generationStatus === 'idle') {
+      // Auto-load most recent completed video in Editor if idle (and no remix reel is loaded)
+      if (completed.length > 0 && !activeVideo && !hasLoadedRemixRef.current && generationStatus === 'idle') {
         setActiveVideo(completed[0]);
       }
     } catch (err) {
