@@ -25,6 +25,7 @@ import {
   HelpCircle,
   Clock,
   X,
+  XCircle,
   RefreshCw,
   FolderOpen,
   Search,
@@ -50,7 +51,8 @@ export default function Studio() {
     createSwapGeneration,
     getStatus,
     deleteGeneration,
-    updateGeneration
+    updateGeneration,
+    cancelGeneration
   } = useGeneration();
 
   // Left panel states — Synchronously initialize from location.state or query param to prevent mode flash
@@ -346,9 +348,10 @@ export default function Studio() {
       if (!selectedModel.supported_resolutions?.includes(resolution)) {
         setResolution(selectedModel.supported_resolutions?.[0] || '720p');
       }
-      // Adjust duration limit
-      if (duration > selectedModel.max_duration) {
-        setDuration(selectedModel.max_duration);
+      // Adjust duration limit (support up to 15 seconds)
+      const maxAllowed = Math.max(15, Number(selectedModel.max_duration) || 15);
+      if (duration > maxAllowed) {
+        setDuration(maxAllowed);
       }
     }
   }, [selectedModel]);
@@ -487,6 +490,41 @@ export default function Studio() {
     }
     setGenerationStatus('idle');
     setGenerationError('');
+  };
+
+  const [cancelling, setCancelling] = useState(false);
+
+  // Cancellation action handler with backend sync & credit refund
+  const handleCancelGeneration = async (targetId = null) => {
+    const idToCancel = targetId || activeGenerationId;
+    if (!idToCancel) {
+      setGenerationStatus('idle');
+      return;
+    }
+    setCancelling(true);
+    try {
+      await cancelGeneration(idToCancel);
+      toast.success('Generation cancelled. Credits refunded.');
+      if (activeGenerationId === idToCancel || !targetId) {
+        setActiveGenerationId(null);
+        setGenerationStatus('idle');
+        setGenerationProgress(0);
+      }
+      await refreshProfile();
+      await loadStudioData();
+    } catch (err) {
+      console.error('[Studio] Cancel generation error:', err);
+      toast.error(err.message || 'Could not cancel generation.');
+      if (err.message?.toLowerCase().includes('not found') || err.message?.toLowerCase().includes('already')) {
+        if (activeGenerationId === idToCancel || !targetId) {
+          setActiveGenerationId(null);
+          setGenerationStatus('idle');
+        }
+        refreshProfile();
+      }
+    } finally {
+      setCancelling(false);
+    }
   };
 
   // Auto-clean failed generation attempt from DB after showing for a while (90s)
@@ -890,7 +928,7 @@ export default function Studio() {
                     <p className="text-[9px] text-white/40 font-bold mt-0.5 uppercase tracking-wider">
                       {selectedModel.model_type === 'image'
                         ? `₹${selectedModel.base_cost} per image`
-                        : `${selectedModel.supported_resolutions?.slice(-1)[0]?.toUpperCase()} · 4s–${selectedModel.max_duration}s`
+                        : `${selectedModel.supported_resolutions?.slice(-1)[0]?.toUpperCase()} · 4s–${Math.max(15, Number(selectedModel.max_duration) || 15)}s`
                       }
                     </p>
                   )}
@@ -965,7 +1003,7 @@ export default function Studio() {
                                 <>
                                   <span className="text-[9px] text-white/35 font-bold">{topRes}</span>
                                   <span className="text-white/15 text-[9px]">·</span>
-                                  <span className="text-[9px] text-white/35 font-bold">4s–{model.max_duration}s</span>
+                                  <span className="text-[9px] text-white/35 font-bold">4s–{Math.max(15, Number(model.max_duration) || 15)}s</span>
                                 </>
                               )}
                             </div>
@@ -1018,21 +1056,25 @@ export default function Studio() {
                   <span className="text-primary-hover font-black">{duration}s</span>
                 </div>
                 <div className="grid grid-cols-6 gap-1 bg-white/5 p-1 rounded-xl border border-white/8">
-                  {[4, 6, 8, 10, 12, 15].map((sec) => (
-                    <button
-                      key={sec}
-                      type="button"
-                      disabled={selectedModel?.max_duration && sec > selectedModel.max_duration}
-                      onClick={() => setDuration(sec)}
-                      className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        duration === sec
-                          ? 'bg-primary text-white shadow-xs'
-                          : 'text-white/60 hover:text-white hover:bg-white/5'
-                      } ${selectedModel?.max_duration && sec > selectedModel.max_duration ? 'opacity-30 cursor-not-allowed' : ''}`}
-                    >
-                      {sec}s
-                    </button>
-                  ))}
+                  {[4, 6, 8, 10, 12, 15].map((sec) => {
+                    const maxAllowed = Math.max(15, Number(selectedModel?.max_duration) || 15);
+                    const isDisabled = sec > maxAllowed;
+                    return (
+                      <button
+                        key={sec}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => setDuration(sec)}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          duration === sec
+                            ? 'bg-primary text-white shadow-xs'
+                            : 'text-white/60 hover:text-white hover:bg-white/5'
+                        } ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+                      >
+                        {sec}s
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1148,24 +1190,38 @@ export default function Studio() {
             { id: 'history', label: 'History' }
           ]}
           actionButton={
-            <Button
-              variant="primary"
-              size="md"
-              disabled={
-                (activeMode === 'swap' ? (!sourceVideoUrl || (!imageUrl && !promptText.trim())) : !promptText.trim()) ||
-                insufficientCredits ||
-                (activeMode === 'image' ? imageGenerating : generationStatus !== 'idle')
-              }
-              onClick={handleGenerate}
-              className="shadow-premium uppercase font-extrabold text-xs tracking-wider cursor-pointer"
-            >
-              {activeMode === 'swap'
-                ? (generationStatus !== 'idle' ? 'Swapping Character...' : 'Swap Character')
-                : activeMode === 'image'
-                ? (imageGenerating ? 'Generating Image...' : (remixImageUrl ? 'Remix Image' : 'Generate Image'))
-                : (generationStatus !== 'idle' ? 'Generating Video...' : 'Generate Video')
-              }
-            </Button>
+            <div className="flex items-center space-x-2">
+              {(generationStatus === 'pending' || generationStatus === 'processing') && (
+                <button
+                  type="button"
+                  disabled={cancelling}
+                  onClick={() => handleCancelGeneration()}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                  title="Cancel this generation and refund credits"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>{cancelling ? 'Cancelling...' : 'Cancel'}</span>
+                </button>
+              )}
+              <Button
+                variant="primary"
+                size="md"
+                disabled={
+                  (activeMode === 'swap' ? (!sourceVideoUrl || (!imageUrl && !promptText.trim())) : !promptText.trim()) ||
+                  insufficientCredits ||
+                  (activeMode === 'image' ? imageGenerating : generationStatus !== 'idle')
+                }
+                onClick={handleGenerate}
+                className="shadow-premium uppercase font-extrabold text-xs tracking-wider cursor-pointer"
+              >
+                {activeMode === 'swap'
+                  ? (generationStatus !== 'idle' ? 'Swapping Character...' : 'Swap Character')
+                  : activeMode === 'image'
+                  ? (imageGenerating ? 'Generating Image...' : (remixImageUrl ? 'Remix Image' : 'Generate Image'))
+                  : (generationStatus !== 'idle' ? 'Generating Video...' : 'Generate Video')
+                }
+              </Button>
+            </div>
           }
         />
 
@@ -1269,8 +1325,19 @@ export default function Studio() {
                           }
                         </p>
                       </div>
-                      <div className="w-64">
+                      <div className="w-64 space-y-3">
                         <ProgressBar value={generationProgress} showGlow />
+                        <div className="flex items-center justify-center pt-1">
+                          <button
+                            type="button"
+                            disabled={cancelling}
+                            onClick={() => handleCancelGeneration()}
+                            className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>{cancelling ? 'Cancelling...' : 'Cancel Generation'}</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : generationStatus === 'failed' ? (
@@ -1376,6 +1443,15 @@ export default function Studio() {
                           <p className="text-[10px] text-white/40 max-w-sm truncate">{video.prompt}</p>
                         </div>
                         <div className="flex items-center space-x-3">
+                          <button
+                            type="button"
+                            disabled={cancelling}
+                            onClick={() => handleCancelGeneration(video.id)}
+                            className="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                            title="Cancel this generation and refund credits"
+                          >
+                            Cancel
+                          </button>
                           <RefreshCw className="w-4 h-4 text-primary animate-spin" />
                         </div>
                       </div>

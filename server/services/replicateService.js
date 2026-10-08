@@ -394,11 +394,27 @@ async function getPredictionStatus(predictionId) {
   }
 }
 
+/**
+ * Cancels an ongoing prediction
+ */
+async function cancelPrediction(predictionId) {
+  try {
+    if (!replicate || !predictionId) return null;
+    const res = await replicate.predictions.cancel(predictionId);
+    console.log(`[replicateService] Cancelled prediction ${predictionId}`);
+    return res;
+  } catch (error) {
+    console.warn(`[replicateService] Could not cancel prediction ${predictionId}:`, error.message);
+    return null;
+  }
+}
+
 module.exports = {
   generateImage,
   generateVideo,
   generateCharacterSwapVideo,
   getPredictionStatus,
+  cancelPrediction,
   extractMediaUrl,
   resolveReplicateModel,
   replicate

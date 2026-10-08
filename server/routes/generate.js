@@ -66,8 +66,9 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
       return res.status(400).json({ error: 'An input image URL is required for Image-to-Video animation.' });
     }
 
-    if (selectedDuration > model.max_duration) {
-      return res.status(400).json({ error: `Selected duration exceeds model maximum of ${model.max_duration} seconds.` });
+    const maxAllowedDuration = Math.max(15, parseInt(model.max_duration || 15));
+    if (selectedDuration > maxAllowedDuration) {
+      return res.status(400).json({ error: `Selected duration exceeds model maximum of ${maxAllowedDuration} seconds.` });
     }
 
     // Cost = duration * price_per_second
@@ -916,6 +917,99 @@ router.get('/:id/status', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Status polling error:', err);
     res.status(500).json({ error: 'Polling error occurred.' });
+  }
+});
+
+/**
+ * POST /api/generate/:id/cancel
+ * Cancels an ongoing generation (video/swap/image), marks it failed/cancelled, and refunds credits.
+ */
+router.post('/:id/cancel', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Fetch generation record for this user
+    const { data: gen, error } = await supabase
+      .from('generations')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (error || !gen) {
+      return res.status(404).json({ error: 'Generation record not found or access denied.' });
+    }
+
+    // 2. Check if already completed
+    if (gen.status === 'completed') {
+      return res.status(400).json({ error: 'Generation has already finished and cannot be cancelled.' });
+    }
+
+    if (gen.status === 'failed') {
+      return res.json({ success: true, message: 'Generation has already ended.', status: gen.status });
+    }
+
+    // 3. If Replicate prediction ID exists, attempt Replicate API cancellation
+    if (gen.fal_request_id) {
+      try {
+        await replicateService.cancelPrediction(gen.fal_request_id);
+      } catch (err) {
+        console.warn(`[Cancel] Failed to cancel Replicate task ${gen.fal_request_id}:`, err.message);
+      }
+    }
+
+    // 4. Update generation record in Supabase
+    const { error: updateErr } = await supabase
+      .from('generations')
+      .update({
+        status: 'failed',
+        error_message: 'Generation cancelled by user.'
+      })
+      .eq('id', id);
+
+    if (updateErr) {
+      console.error('[Cancel] DB update error:', updateErr);
+    }
+
+    // 5. Refund credits atomically
+    const refundCost = parseFloat(gen.cost || 0);
+    if (refundCost > 0) {
+      try {
+        await creditService.addCredits(
+          req.user.id,
+          refundCost,
+          `Refund for cancelled generation ${gen.id}`,
+          `cancel-${gen.id}`,
+          `cancel-${gen.id}`,
+          'refund'
+        );
+        console.log(`[Cancel] Successfully refunded ₹${refundCost} to user ${req.user.id}`);
+      } catch (refundErr) {
+        console.error('[Cancel] Error refunding credits:', refundErr);
+      }
+    }
+
+    // 6. Create notification for user
+    try {
+      await createNotification(
+        req.user.id,
+        'Generation Cancelled ⏹️',
+        `Generation "${gen.title || 'Video'}" was cancelled. ₹${refundCost.toFixed(2)} refunded to your balance.`,
+        'info'
+      );
+    } catch (notifErr) {
+      console.warn('[Cancel] Notification error:', notifErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Generation successfully cancelled. Credits have been refunded.',
+      refundedCost: refundCost,
+      id
+    });
+  } catch (err) {
+    console.error('[Cancel] Controller error:', err);
+    res.status(500).json({ error: err.message || 'Failed to cancel generation.' });
   }
 });
 

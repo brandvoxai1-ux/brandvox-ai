@@ -89,6 +89,16 @@ export function useGeneration() {
     }
   };
 
+  const cancelGeneration = async (id) => {
+    try {
+      const res = await api.post(`/generate/${id}/cancel`);
+      return res.data;
+    } catch (err) {
+      const errMsg = err.response?.data?.error || err.message || 'Failed to cancel generation.';
+      throw new Error(errMsg);
+    }
+  };
+
   return {
     generations,
     loading,
@@ -99,6 +109,7 @@ export function useGeneration() {
     createSwapGeneration,
     getStatus,
     updateGeneration,
-    deleteGeneration
+    deleteGeneration,
+    cancelGeneration
   };
 }
