@@ -209,6 +209,7 @@ async function generateCharacterSwapVideo({
   source_video,
   target_character,
   characters = [],
+  prop_image,
   prompt,
   aspect_ratio = '16:9',
   webhookUrl,
@@ -229,58 +230,95 @@ async function generateCharacterSwapVideo({
     characterList = [{ target_image_url: String(target_character).trim(), label: 'main character' }];
   }
 
-  // Filter valid image URLs
+  // Filter valid character image URLs
   const validPhotos = characterList
     .map(c => typeof c === 'string' ? { target_image_url: c, label: '' } : c)
     .filter(c => c && c.target_image_url && String(c.target_image_url).trim());
 
   const hasTargetPhotos = validPhotos.length > 0;
+  const hasPropImage = prop_image && typeof prop_image === 'string' && prop_image.trim().length > 0;
+  const propIndex = validPhotos.length + 1;
+
+  // Build reference_images array: characters first, then optional prop/object
+  const allReferenceImages = validPhotos.map(c => c.target_image_url);
+  if (hasPropImage) {
+    allReferenceImages.push(prop_image.trim());
+  }
+
+  // Helper to translate Google Flow @tag mentions into model-native syntax
+  const translatePromptTags = (rawPrompt, isSeedance) => {
+    if (!rawPrompt || !rawPrompt.trim()) return '';
+    let p = rawPrompt;
+    // Replace @Motion
+    p = p.replace(/@Motion\b/gi, isSeedance ? '[Video1]' : '<<<video_1>>>');
+    // Replace @Char 1..5 or @Char1..5
+    for (let i = 1; i <= 5; i++) {
+      const charRegex = new RegExp(`@Char\\s*${i}\\b`, 'gi');
+      p = p.replace(charRegex, isSeedance ? `[Image${i}]` : `<<<image_${i}>>>`);
+    }
+    // Replace @Prop or @Object
+    const propToken = isSeedance ? `[Image${propIndex}]` : `<<<image_${propIndex}>>>`;
+    p = p.replace(/@(Prop|Object)\b/gi, propToken);
+    return p;
+  };
 
   if (model.includes('seedance')) {
+    const userPromptTranslated = translatePromptTags(prompt, true);
+    const propDirective = hasPropImage ? `, featuring object/prop [Image${propIndex}]` : '';
+
     if (hasTargetPhotos) {
       if (validPhotos.length === 1) {
         const charLabel = validPhotos[0].label?.trim() ? `the ${validPhotos[0].label}` : 'the main character';
-        input.prompt = prompt && prompt.trim()
-          ? `Replace ${charLabel} in [Video1] with the person in [Image1], ${prompt}, seamless motion transfer, perfect facial resemblance, identical head choreography, high realism, 8k render`
-          : `Replace ${charLabel} in [Video1] with the person in [Image1], seamless motion transfer, exact facial features, preserving original choreography and movement, cinematic 8k`;
+        input.prompt = userPromptTranslated
+          ? `Replace ${charLabel} in [Video1] with the person in [Image1]${propDirective}, ${userPromptTranslated}, seamless motion transfer, perfect facial resemblance, identical head choreography, high realism, 8k render`
+          : `Replace ${charLabel} in [Video1] with the person in [Image1]${propDirective}, seamless motion transfer, exact facial features, preserving original choreography and movement, cinematic 8k`;
       } else {
         // Multi-character Seedance prompt
         const directives = validPhotos.map((c, i) => {
           const desc = c.label?.trim() ? `the ${c.label}` : `character ${i + 1}`;
           return `replace ${desc} in [Video1] with [Image${i + 1}]`;
         }).join(', and ');
-        input.prompt = `Multi-character replacement in [Video1]: ${directives}. ${prompt ? `${prompt}, ` : ''}seamless motion transfer, exact facial features, preserving original choreography and movement, cinematic 8k`;
+        input.prompt = `Multi-character replacement in [Video1]: ${directives}${propDirective}. ${userPromptTranslated ? `${userPromptTranslated}, ` : ''}seamless motion transfer, exact facial features, preserving original choreography and movement, cinematic 8k`;
       }
-      input.reference_images = validPhotos.map(c => c.target_image_url);
+      input.reference_images = allReferenceImages;
     } else {
-      input.prompt = prompt && prompt.trim()
-        ? `Transform the main character in [Video1] into: ${prompt}, exact motion transfer, preserving original movement and choreography, cinematic 8k`
-        : 'Transform the character in [Video1], exact motion transfer, preserving original movement and choreography, cinematic 8k';
+      input.prompt = userPromptTranslated
+        ? `Transform the main character in [Video1] into: ${userPromptTranslated}${propDirective}, exact motion transfer, preserving original movement and choreography, cinematic 8k`
+        : `Transform the character in [Video1]${propDirective}, exact motion transfer, preserving original movement and choreography, cinematic 8k`;
+      if (hasPropImage) {
+        input.reference_images = allReferenceImages;
+      }
     }
     if (source_video) input.reference_videos = [source_video];
     input.resolution = '720p';
     input.generate_audio = true;
   } else {
     // Kling v3 Omni Director
+    const userPromptTranslated = translatePromptTags(prompt, false);
+    const propDirective = hasPropImage ? `, featuring object/prop <<<image_${propIndex}>>>` : '';
+
     if (hasTargetPhotos) {
       if (validPhotos.length === 1) {
         const charLabel = validPhotos[0].label?.trim() ? `(${validPhotos[0].label})` : 'main character';
-        input.prompt = prompt && prompt.trim()
-          ? `Exact character replacement in <<<video_1>>> of ${charLabel} with <<<image_1>>>, ${prompt}, preserve original head orientation, precise facial anatomy matching, identical skin tone and facial structure, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic`
-          : `Exact character replacement in <<<video_1>>> of ${charLabel} with <<<image_1>>>, preserve original head orientation, precise facial anatomy matching, identical skin tone and facial structure, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic`;
+        input.prompt = userPromptTranslated
+          ? `Exact character replacement in <<<video_1>>> of ${charLabel} with <<<image_1>>>${propDirective}, ${userPromptTranslated}, preserve original head orientation, precise facial anatomy matching, identical skin tone and facial structure, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic`
+          : `Exact character replacement in <<<video_1>>> of ${charLabel} with <<<image_1>>>${propDirective}, preserve original head orientation, precise facial anatomy matching, identical skin tone and facial structure, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic`;
       } else {
         // Multi-character Kling Omni prompt with semantic anchoring
         const directives = validPhotos.map((c, i) => {
           const desc = c.label?.trim() ? `(${c.label})` : `character ${i + 1}`;
           return `replace ${desc} with <<<image_${i + 1}>>>`;
         }).join(', and ');
-        input.prompt = `Multi-character replacement in <<<video_1>>>: ${directives}. ${prompt ? `${prompt}, ` : ''}preserve original head orientation, precise facial anatomy matching, identical skin tone, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic`;
+        input.prompt = `Multi-character replacement in <<<video_1>>>: ${directives}${propDirective}. ${userPromptTranslated ? `${userPromptTranslated}, ` : ''}preserve original head orientation, precise facial anatomy matching, identical skin tone, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic`;
       }
-      input.reference_images = validPhotos.map(c => c.target_image_url);
+      input.reference_images = allReferenceImages;
     } else {
-      input.prompt = prompt && prompt.trim()
-        ? `Transform the character in <<<video_1>>> into: ${prompt}, exact motion transfer, cinematic 8k photorealistic, match original choreography and camera movement`
-        : 'Transform the character in <<<video_1>>>, exact motion transfer, cinematic 8k photorealistic, match original choreography and camera movement';
+      input.prompt = userPromptTranslated
+        ? `Transform the character in <<<video_1>>> into: ${userPromptTranslated}${propDirective}, exact motion transfer, cinematic 8k photorealistic, match original choreography and camera movement`
+        : `Transform the character in <<<video_1>>>${propDirective}, exact motion transfer, cinematic 8k photorealistic, match original choreography and camera movement`;
+      if (hasPropImage) {
+        input.reference_images = allReferenceImages;
+      }
     }
     if (source_video) {
       input.reference_video = source_video;

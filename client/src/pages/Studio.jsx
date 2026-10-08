@@ -94,6 +94,7 @@ export default function Studio() {
     return '';
   }); // Image-to-Image remix reference photo
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false); // Mobile slide-up drawer
+  const [propImageUrl, setPropImageUrl] = useState(''); // Optional Object/Prop ingredient
 
   // Multi-Character Swap state (supports 1 to 5 characters with role labels)
   const [swapCharacters, setSwapCharacters] = useState(() => {
@@ -685,6 +686,7 @@ export default function Studio() {
           source_video_url: sourceVideoUrl,
           target_character_url: primaryChar,
           characters: validCharacters.length > 0 ? validCharacters : (primaryChar ? [{ id: 'char-1', target_image_url: primaryChar, label: '' }] : []),
+          prop_image_url: propImageUrl || null,
           prompt: promptText,
           model_id: selectedModel.id,
           duration: duration,
@@ -793,7 +795,7 @@ export default function Studio() {
           <div className="flex bg-surface-elevated p-0.5 rounded-lg border border-white/5 text-[9.5px] font-bold uppercase tracking-wider">
             {[
               { id: 'video', label: 'Video', icon: Film },
-              { id: 'swap', label: 'Swap', icon: UserCheck },
+              { id: 'swap', label: 'Ingredients', icon: Users },
               { id: 'image', label: 'Image', icon: Sparkles }
             ].map(({ id, label, icon: Icon }) => (
               <button
@@ -874,15 +876,15 @@ export default function Studio() {
             </div>
           )}
 
-          {/* CHARACTER SWAP V2V MEDIA SECTION */}
+          {/* INGREDIENTS ENGINE MEDIA SECTION (Google Flow Style) */}
           {activeMode === 'swap' && (
             <div className="space-y-3">
-              {/* Step 1: Source Video */}
+              {/* Step 1: Motion Video (@Motion) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest flex items-center gap-1">
                     <span className="text-primary font-black">1.</span>
-                    <span>Source Video</span>
+                    <span>Motion Video (@Motion)</span>
                   </label>
                   {sourceVideoUrl && (
                     <button
@@ -904,28 +906,28 @@ export default function Studio() {
                 </p>
               </div>
 
-              {/* Step 2: Target Characters (Supports up to 5 Characters) */}
+              {/* Step 2: Character Ingredients (@Char 1 to @Char 5) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest flex items-center gap-1">
                     <span className="text-primary font-black">2.</span>
-                    <span>Target Characters ({swapCharacters.filter(c => c.target_image_url).length || 1}/5)</span>
+                    <span>Character Ingredients (@Char 1–{swapCharacters.length})</span>
                   </label>
                   {swapCharacters.length < 5 && (
                     <button
                       type="button"
                       onClick={handleAddCharacter}
                       className="flex items-center gap-1 text-[9px] font-extrabold text-primary-hover hover:text-white bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md border border-primary/20 transition-all cursor-pointer active:scale-95"
-                      title="Add another character replacement (up to 5)"
+                      title="Add another character ingredient (up to 5)"
                     >
                       <Plus className="w-2.5 h-2.5" />
-                      <span>Add Character</span>
+                      <span>Add Ingredient</span>
                     </button>
                   )}
                 </div>
 
                 {/* Character Slots List */}
-                <div className="space-y-2 max-h-[36vh] overflow-y-auto pr-0.5 scrollbar-thin">
+                <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-0.5 scrollbar-thin">
                   {swapCharacters.map((char, index) => (
                     <div
                       key={char.id}
@@ -937,7 +939,7 @@ export default function Studio() {
                             {index + 1}
                           </span>
                           <span className="text-[10px] font-bold text-white/80">
-                            {index === 0 ? 'Primary Character' : `Character ${index + 1}`}
+                            {index === 0 ? 'Primary Character (@Char1)' : `Character ${index + 1} (@Char${index + 1})`}
                           </span>
                         </div>
                         {index > 0 && (
@@ -966,8 +968,8 @@ export default function Studio() {
                           type="text"
                           placeholder={
                             index === 0
-                              ? "Anchor: e.g. Center person, Man in suit..."
-                              : `Anchor: e.g. Person on right, Woman in red...`
+                              ? "Role / Anchor: e.g. Center dancer, Man in black suit..."
+                              : `Role / Anchor: e.g. Person on right, Woman in red...`
                           }
                           value={char.label}
                           onChange={(e) => handleUpdateCharacter(char.id, 'label', e.target.value)}
@@ -975,12 +977,41 @@ export default function Studio() {
                           className="w-full bg-black/40 border border-white/8 rounded-lg px-2.5 py-1 text-[10px] text-white/85 placeholder-white/25 focus:outline-none focus:border-primary/50 transition-colors"
                         />
                         <p className="text-[8px] text-white/30 leading-tight">
-                          Anchor tags help the AI map faces accurately in multi-person scenes.
+                          Anchor roles help the AI map faces accurately across multi-person scenes.
                         </p>
                       </div>
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Step 3: Object / Prop Ingredient (@Prop - Optional) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest flex items-center gap-1">
+                    <span className="text-primary font-black">3.</span>
+                    <span>Object / Prop (@Prop)</span>
+                    <span className="text-white/30 lowercase font-normal">(optional)</span>
+                  </label>
+                  {propImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setPropImageUrl('')}
+                      className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <ImageUploader
+                  value={propImageUrl}
+                  onUrlReady={(url) => setPropImageUrl(url)}
+                  onClear={() => setPropImageUrl('')}
+                  compact
+                />
+                <p className="text-[8.5px] text-white/35 font-medium leading-tight">
+                  Optional product, costume accessory, or branded prop to composite into video.
+                </p>
               </div>
 
               {/* Likeness Rights & Regulatory Compliance Badge */}
@@ -990,7 +1021,7 @@ export default function Studio() {
                   <span>Likeness Consent & Compliance</span>
                 </div>
                 <p className="text-[8.5px] text-white/60 leading-tight">
-                  By submitting motion swaps, you affirm you hold necessary rights or consent from the depicted individual in accordance with our <Link to="/terms" target="_blank" className="text-primary-hover hover:underline font-semibold">Terms of Service</Link>.
+                  By submitting motion swaps, you affirm you hold necessary rights or consent from depicted individuals in accordance with our <Link to="/terms" target="_blank" className="text-primary-hover hover:underline font-semibold">Terms of Service</Link>.
                 </p>
               </div>
             </div>
@@ -1076,7 +1107,7 @@ export default function Studio() {
                 <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
                   <Sparkles className="w-2.5 h-2.5 text-primary/50" />
                   <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">
-                    {activeMode === 'image' ? 'Image Models' : activeMode === 'swap' ? 'Character Swap Motion Models' : 'Video Models'}
+                    {activeMode === 'image' ? 'Image Models' : activeMode === 'swap' ? 'Ingredients Motion Models' : 'Video Models'}
                   </span>
                 </div>
                 <div className="pb-2 max-h-60 overflow-y-auto">
@@ -1336,7 +1367,7 @@ export default function Studio() {
                 className="shadow-premium uppercase font-extrabold text-xs tracking-wider cursor-pointer"
               >
                 {activeMode === 'swap'
-                  ? (generationStatus !== 'idle' ? 'Swapping Character...' : 'Swap Character')
+                  ? (generationStatus !== 'idle' ? 'Composing Ingredients...' : 'Compose Video')
                   : activeMode === 'image'
                   ? (imageGenerating ? 'Generating Image...' : (remixImageUrl ? 'Remix Image' : 'Generate Image'))
                   : (generationStatus !== 'idle' ? 'Generating Video...' : 'Generate Video')
@@ -1353,7 +1384,7 @@ export default function Studio() {
           <div className="lg:hidden flex items-center justify-between bg-surface-elevated/90 backdrop-blur-md px-3 py-2 rounded-xl border border-white/8 text-xs select-none shadow-sm">
             <div className="flex items-center space-x-1.5 overflow-hidden">
               <span className="px-2 py-0.5 rounded-md bg-primary/20 text-primary-hover font-black text-[9.5px] uppercase shrink-0">
-                {activeMode === 'swap' ? 'Swap' : activeMode === 'image' ? 'Image' : 'Video'}
+                {activeMode === 'swap' ? 'Ingredients' : activeMode === 'image' ? 'Image' : 'Video'}
               </span>
               <span className="font-bold text-white/90 text-xs truncate max-w-[130px]">
                 {selectedModel?.name || 'Model'}
@@ -1437,11 +1468,11 @@ export default function Studio() {
                       <RefreshCw className="w-8 h-8 text-primary-hover animate-spin" />
                       <div>
                         <h4 className="text-sm font-bold text-white tracking-wide">
-                          {activeMode === 'swap' ? 'Synthesizing Character Motion Transfer' : 'Compiling Cinematic Frames'}
+                          {activeMode === 'swap' ? 'Composing Ingredients Motion Video' : 'Compiling Cinematic Frames'}
                         </h4>
                         <p className="text-[10.5px] text-white/45 mt-1 font-semibold uppercase tracking-wider">
                           {activeMode === 'swap' 
-                            ? `Transferring motion onto ${selectedModel?.name || 'Wan 3.0'}...`
+                            ? `Synthesizing motion & ingredients with ${selectedModel?.name || 'Kling 3.0 Omni'}...`
                             : `Running ${selectedModel?.name} pipeline in background...`
                           }
                         </p>
@@ -1661,13 +1692,82 @@ export default function Studio() {
               </button>
             </div>
 
+            {/* Google Flow Ingredients Quick-Tag Chips (Ingredients Mode) */}
+            {activeMode === 'swap' && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-white/5 text-[9.5px]">
+                <span className="font-black uppercase text-primary tracking-wider shrink-0 flex items-center gap-1 mr-0.5">
+                  <Users className="w-3 h-3 text-primary" />
+                  Ingredients:
+                </span>
+                {/* @Motion Chip */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromptText(prev => prev.includes('@Motion') ? prev : `${prev ? `${prev} ` : ''}@Motion`);
+                    promptRef.current?.focus();
+                  }}
+                  className={`px-2 py-0.5 rounded-md font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                    sourceVideoUrl
+                      ? 'bg-primary/20 text-primary-hover border-primary/30 hover:bg-primary/30'
+                      : 'bg-white/5 text-white/40 border-white/10 opacity-70 hover:opacity-100'
+                  }`}
+                  title="Tag source motion video reference (@Motion)"
+                >
+                  <Film className="w-2.5 h-2.5" />
+                  <span>@Motion</span>
+                </button>
+
+                {/* @Char 1..N Chips */}
+                {swapCharacters.map((char, idx) => {
+                  const tag = `@Char${idx + 1}`;
+                  const hasPhoto = Boolean(char.target_image_url);
+                  return (
+                    <button
+                      key={char.id}
+                      type="button"
+                      onClick={() => {
+                        setPromptText(prev => prev.includes(tag) ? prev : `${prev ? `${prev} ` : ''}${tag}`);
+                        promptRef.current?.focus();
+                      }}
+                      className={`px-2 py-0.5 rounded-md font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                        hasPhoto
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30'
+                          : 'bg-white/5 text-white/40 border-white/10 opacity-70 hover:opacity-100'
+                      }`}
+                      title={char.label ? `Tag character: ${char.label}` : `Tag Character ${idx + 1}`}
+                    >
+                      <Users className="w-2.5 h-2.5" />
+                      <span>{tag}</span>
+                    </button>
+                  );
+                })}
+
+                {/* @Prop Chip */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromptText(prev => prev.includes('@Prop') ? prev : `${prev ? `${prev} ` : ''}@Prop`);
+                    promptRef.current?.focus();
+                  }}
+                  className={`px-2 py-0.5 rounded-md font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                    propImageUrl
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30'
+                      : 'bg-white/5 text-white/40 border-white/10 opacity-70 hover:opacity-100'
+                  }`}
+                  title="Tag prop/object ingredient (@Prop)"
+                >
+                  <span>📦 @Prop</span>
+                </button>
+              </div>
+            )}
+
             {/* Prompt Textarea */}
             <div className="relative">
               <textarea
                 ref={promptRef}
                 placeholder={
                   activeMode === 'swap'
-                    ? "Describe desired character tweaks (e.g. Cyberpunk warrior, Indian wedding attire, neon lighting)..."
+                    ? "Direct your scene with ingredients (e.g. '@Char1 dressed as warrior holding @Prop, perfectly matching @Motion choreography')..."
                     : activeMode === 'image'
                     ? "Describe your visual ad idea in rich detail (e.g. Luxury perfume bottle on marble, soft lighting)..."
                     : "Describe your commercial scene — product actions, camera shifts, and moody lighting..."
@@ -1684,7 +1784,11 @@ export default function Studio() {
             </div>
             
             <div className="flex items-center justify-between text-[10px] text-white/40 font-semibold uppercase tracking-wider">
-              <span className="truncate mr-2">💡 Tip: Click "🪄 Enhance for Ads" for viral commercial prompt</span>
+              <span className="truncate mr-2">
+                {activeMode === 'swap'
+                  ? '💡 Tip: Click ingredient tags (@Motion, @Char, @Prop) to direct specific actors & props'
+                  : '💡 Tip: Click "🪄 Enhance for Ads" for viral commercial prompt'}
+              </span>
               <span className="hidden sm:inline shrink-0">Ctrl+Enter to compile</span>
             </div>
           </div>

@@ -16,7 +16,7 @@
   },
   "license": "UNLICENSED",
   "main": "index.js",
-  "repository": "https://github.com/himuhimumsd-del/Brandvoxaiii.git",
+  "repository": "https://github.com/brandvoxai1-ux/brandvox-ai.git",
   "author": "Himanshu <himuhimumsd@gmail.com>",
   "dependencies": {
     "serverless-http": "^4.0.0"
