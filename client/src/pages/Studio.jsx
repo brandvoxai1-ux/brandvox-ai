@@ -36,7 +36,10 @@ import {
   Video as VideoIcon,
   Volume2,
   VolumeX,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Plus,
+  Trash2,
+  Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -91,6 +94,51 @@ export default function Studio() {
     return '';
   }); // Image-to-Image remix reference photo
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false); // Mobile slide-up drawer
+
+  // Multi-Character Swap state (supports 1 to 5 characters with role labels)
+  const [swapCharacters, setSwapCharacters] = useState(() => {
+    const initUrl = location.state?.remixMedia?.input_image_url || '';
+    return [{ id: 'char-1', target_image_url: initUrl, label: '' }];
+  });
+
+  const handleAddCharacter = () => {
+    if (swapCharacters.length >= 5) {
+      toast.error('Maximum 5 characters allowed per video.');
+      return;
+    }
+    const newId = `char-${Date.now()}`;
+    setSwapCharacters(prev => [
+      ...prev,
+      { id: newId, target_image_url: '', label: '' }
+    ]);
+  };
+
+  const handleRemoveCharacter = (idToRemove) => {
+    if (swapCharacters.length <= 1) {
+      setSwapCharacters([{ id: 'char-1', target_image_url: '', label: '' }]);
+      setImageUrl('');
+      return;
+    }
+    setSwapCharacters(prev => {
+      const filtered = prev.filter(c => c.id !== idToRemove);
+      if (filtered[0]?.target_image_url !== imageUrl) {
+        setImageUrl(filtered[0]?.target_image_url || '');
+      }
+      return filtered;
+    });
+  };
+
+  const handleUpdateCharacter = (id, field, value) => {
+    setSwapCharacters(prev => prev.map(c => {
+      if (c.id === id) {
+        return { ...c, [field]: value };
+      }
+      return c;
+    }));
+    if (field === 'target_image_url' && swapCharacters[0]?.id === id) {
+      setImageUrl(value);
+    }
+  };
 
   // AI Prompt Enhancer state
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -192,6 +240,15 @@ export default function Studio() {
         if (media.video_url) {
           setActiveVideo(media);
           setSourceVideoUrl(media.video_url);
+        }
+        if (Array.isArray(media.characters) && media.characters.length > 0) {
+          setSwapCharacters(media.characters);
+          if (media.characters[0]?.target_image_url) {
+            setImageUrl(media.characters[0].target_image_url);
+          }
+        } else if (media.input_image_url) {
+          setImageUrl(media.input_image_url);
+          setSwapCharacters([{ id: 'char-1', target_image_url: media.input_image_url, label: '' }]);
         }
         if (models.length > 0) {
           const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
@@ -611,8 +668,11 @@ export default function Studio() {
         return;
       }
 
-      if (!imageUrl && !promptText.trim()) {
-        toast.error('Please provide a target character photo or character description prompt.');
+      const validCharacters = swapCharacters.filter(c => c.target_image_url && c.target_image_url.trim());
+      const primaryChar = validCharacters[0]?.target_image_url || imageUrl || null;
+
+      if (!primaryChar && !promptText.trim()) {
+        toast.error('Please provide at least one target character photo or character description prompt.');
         return;
       }
 
@@ -623,7 +683,8 @@ export default function Studio() {
 
         const payload = {
           source_video_url: sourceVideoUrl,
-          target_character_url: imageUrl || null,
+          target_character_url: primaryChar,
+          characters: validCharacters.length > 0 ? validCharacters : (primaryChar ? [{ id: 'char-1', target_image_url: primaryChar, label: '' }] : []),
           prompt: promptText,
           model_id: selectedModel.id,
           duration: duration,
@@ -635,7 +696,12 @@ export default function Studio() {
 
         if (res.success && res.generationId) {
           setActiveGenerationId(res.generationId);
-          toast.loading('Initiating Character Replacement pipeline...', { id: 'gen-dispatch' });
+          toast.loading(
+            validCharacters.length > 1
+              ? `Initiating Multi-Character (${validCharacters.length}) replacement pipeline...`
+              : 'Initiating Character Replacement pipeline...',
+            { id: 'gen-dispatch' }
+          );
           setTimeout(() => toast.dismiss('gen-dispatch'), 2000);
         }
       } catch (err) {
@@ -838,31 +904,83 @@ export default function Studio() {
                 </p>
               </div>
 
-              {/* Step 2: Target Character */}
-              <div className="space-y-1.5">
+              {/* Step 2: Target Characters (Supports up to 5 Characters) */}
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest flex items-center gap-1">
                     <span className="text-primary font-black">2.</span>
-                    <span>Target Character</span>
+                    <span>Target Characters ({swapCharacters.filter(c => c.target_image_url).length || 1}/5)</span>
                   </label>
-                  {imageUrl && (
+                  {swapCharacters.length < 5 && (
                     <button
-                      onClick={() => setImageUrl('')}
-                      className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                      type="button"
+                      onClick={handleAddCharacter}
+                      className="flex items-center gap-1 text-[9px] font-extrabold text-primary-hover hover:text-white bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md border border-primary/20 transition-all cursor-pointer active:scale-95"
+                      title="Add another character replacement (up to 5)"
                     >
-                      Clear
+                      <Plus className="w-2.5 h-2.5" />
+                      <span>Add Character</span>
                     </button>
                   )}
                 </div>
-                <ImageUploader
-                  value={imageUrl}
-                  onUrlReady={(url) => setImageUrl(url)}
-                  onClear={() => setImageUrl('')}
-                  compact
-                />
-                <p className="text-[8.5px] text-white/35 font-medium leading-tight">
-                  Clear front-facing portrait or character photo. Leave blank if only using prompt.
-                </p>
+
+                {/* Character Slots List */}
+                <div className="space-y-2 max-h-[36vh] overflow-y-auto pr-0.5 scrollbar-thin">
+                  {swapCharacters.map((char, index) => (
+                    <div
+                      key={char.id}
+                      className="p-2.5 rounded-xl bg-white/4 border border-white/8 space-y-2 transition-all hover:border-white/15"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-primary/20 text-primary-hover text-[9px] font-black flex items-center justify-center">
+                            {index + 1}
+                          </span>
+                          <span className="text-[10px] font-bold text-white/80">
+                            {index === 0 ? 'Primary Character' : `Character ${index + 1}`}
+                          </span>
+                        </div>
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCharacter(char.id)}
+                            className="p-1 text-white/40 hover:text-error transition-colors cursor-pointer"
+                            title="Remove character slot"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Photo Uploader */}
+                      <ImageUploader
+                        value={char.target_image_url}
+                        onUrlReady={(url) => handleUpdateCharacter(char.id, 'target_image_url', url)}
+                        onClear={() => handleUpdateCharacter(char.id, 'target_image_url', '')}
+                        compact
+                      />
+
+                      {/* Visual Anchor / Role in Video */}
+                      <div className="space-y-1">
+                        <input
+                          type="text"
+                          placeholder={
+                            index === 0
+                              ? "Anchor: e.g. Center person, Man in suit..."
+                              : `Anchor: e.g. Person on right, Woman in red...`
+                          }
+                          value={char.label}
+                          onChange={(e) => handleUpdateCharacter(char.id, 'label', e.target.value)}
+                          maxLength={60}
+                          className="w-full bg-black/40 border border-white/8 rounded-lg px-2.5 py-1 text-[10px] text-white/85 placeholder-white/25 focus:outline-none focus:border-primary/50 transition-colors"
+                        />
+                        <p className="text-[8px] text-white/30 leading-tight">
+                          Anchor tags help the AI map faces accurately in multi-person scenes.
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Likeness Rights & Regulatory Compliance Badge */}
@@ -1207,7 +1325,10 @@ export default function Studio() {
                 variant="primary"
                 size="md"
                 disabled={
-                  (activeMode === 'swap' ? (!sourceVideoUrl || (!imageUrl && !promptText.trim())) : !promptText.trim()) ||
+                  (activeMode === 'swap' 
+                    ? (!sourceVideoUrl || (!imageUrl && !swapCharacters.some(c => Boolean(c.target_image_url?.trim())) && !promptText.trim()))
+                    : !promptText.trim()
+                  ) ||
                   insufficientCredits ||
                   (activeMode === 'image' ? imageGenerating : generationStatus !== 'idle')
                 }

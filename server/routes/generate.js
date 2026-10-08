@@ -440,6 +440,7 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
   const {
     source_video_url,
     target_character_url,
+    characters = [],
     prompt,
     model_id,
     duration,
@@ -450,8 +451,15 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
     return res.status(400).json({ error: 'Source motion video is required for character replacement.' });
   }
 
-  if (!target_character_url && (!prompt || prompt.trim().length === 0)) {
-    return res.status(400).json({ error: 'Please provide either a target character image or a detailed character prompt.' });
+  // Normalize multi-character list
+  let normalizedCharacters = Array.isArray(characters) && characters.length > 0 ? characters : [];
+  if (normalizedCharacters.length === 0 && target_character_url) {
+    normalizedCharacters = [{ target_image_url: target_character_url, label: '' }];
+  }
+  const primaryCharacterUrl = normalizedCharacters[0]?.target_image_url || target_character_url || null;
+
+  if (!primaryCharacterUrl && (!prompt || prompt.trim().length === 0)) {
+    return res.status(400).json({ error: 'Please provide at least one target character image or a detailed character prompt.' });
   }
 
   if (prompt) {
@@ -502,9 +510,10 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
     }
 
     // 3. Insert record into generations with schema-safe resilient fallback
+    const charCount = normalizedCharacters.length;
     const displayTitle = prompt && prompt.trim() 
-      ? `Character Swap: ${prompt.slice(0, 25).trim()}...` 
-      : 'Character Replacement Video';
+      ? `Character Swap (${charCount > 1 ? `${charCount} chars` : '1 char'}): ${prompt.slice(0, 25).trim()}...` 
+      : `Character Replacement (${charCount > 1 ? `${charCount} chars` : '1 char'})`;
 
     const insertPayload = {
       user_id: req.user.id,
@@ -519,7 +528,8 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
       cost: estimatedCost,
       generation_type: 'swap',
       source_video_url,
-      input_image_url: target_character_url || null,
+      input_image_url: primaryCharacterUrl,
+      characters: normalizedCharacters,
       is_public: false
     };
 
@@ -529,11 +539,24 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
       .select()
       .single();
 
+    if (dbErr && (dbErr.message.includes('characters') || dbErr.message.includes('schema cache') || dbErr.message.includes('column'))) {
+      console.warn('[CharacterSwap] characters column not in schema cache, retrying:', dbErr.message);
+      delete insertPayload.characters;
+      const retryResult = await supabase
+        .from('generations')
+        .insert(insertPayload)
+        .select()
+        .single();
+      generation = retryResult.data;
+      dbErr = retryResult.error;
+    }
+
     if (dbErr) {
       console.warn('[CharacterSwap] Primary insert failed, applying resilient fallback:', dbErr.message);
       const retryPayload = { ...insertPayload };
       delete retryPayload.source_video_url;
       delete retryPayload.input_image_url;
+      delete retryPayload.characters;
 
       let retry = await supabase.from('generations').insert(retryPayload).select().single();
       if (retry.error && retry.error.message.includes('generations_generation_type_check')) {
@@ -582,7 +605,8 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
         const result = await replicateService.generateCharacterSwapVideo({
           endpoint: model.fal_endpoint,
           source_video: readyVideoUrl,
-          target_character: target_character_url,
+          target_character: primaryCharacterUrl,
+          characters: normalizedCharacters,
           prompt,
           aspect_ratio: aspect_ratio || '16:9',
           webhookUrl,
