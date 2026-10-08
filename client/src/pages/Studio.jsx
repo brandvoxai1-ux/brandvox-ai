@@ -1,6 +1,6 @@
 // client/src/pages/Studio.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useGeneration } from '../hooks/useGeneration';
 import { useModels } from '../hooks/useModels';
@@ -58,7 +58,8 @@ export default function Studio() {
     const params = new URLSearchParams(window.location.search);
     const paramMode = params.get('mode');
     if (paramMode && ['video', 'swap', 'image'].includes(paramMode)) return paramMode;
-    if (location.state?.remixMedia || location.state?.mediaType === 'swap') return 'swap';
+    if (location.state?.mediaType && ['video', 'swap', 'image'].includes(location.state.mediaType)) return location.state.mediaType;
+    if (location.state?.remixMedia?.generation_type && ['video', 'swap', 'image'].includes(location.state.remixMedia.generation_type)) return location.state.remixMedia.generation_type;
     if (location.state?.template?.media_type) return location.state.template.media_type;
     return 'video';
   });
@@ -164,6 +165,7 @@ export default function Studio() {
       const isImg = media.generation_type === 'image' || 
                     location.state.mediaType === 'image' || 
                     (media.video_url && /\.(jpg|jpeg|png|webp)($|\?)/i.test(media.video_url));
+      const isSwap = media.generation_type === 'swap' || location.state.mediaType === 'swap';
 
       if (prompt) setPromptText(prompt);
       if (title) setProjectTitle(title);
@@ -182,8 +184,8 @@ export default function Studio() {
           const found = models.find(m => m.id === modelVal || m.fal_endpoint === modelVal || m.name === modelVal);
           if (found) setSelectedModel(found);
         }
-      } else {
-        // Video mode -> Directly activate Character Swap mode
+        toast.success(`✨ "${title}" loaded for image remix!`, { icon: '🎨', duration: 3500 });
+      } else if (isSwap) {
         setActiveMode('swap');
         if (media.video_url) {
           setActiveVideo(media);
@@ -198,11 +200,29 @@ export default function Studio() {
           if (found) setSelectedModel(found);
         }
         toast.success(`✨ "${media.title || 'Reel'}" loaded in Character Swap! Upload character in Step 2.`, { icon: '🎭', duration: 4500 });
+      } else {
+        // Standard Text-to-Video / Image-to-Video Remix
+        setActiveMode('video');
+        if (media.video_url) {
+          setActiveVideo(media);
+        }
+        if (media.input_image_url) {
+          setImageUrl(media.input_image_url);
+        }
+        if (models.length > 0) {
+          const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
+          const found = videoModels.find(m => m.id === modelVal || m.fal_endpoint === modelVal || m.name === modelVal) || videoModels[0];
+          if (found) setSelectedModel(found);
+        }
+        toast.success(`✨ "${media.title || 'Reel'}" loaded in Video Studio for remix!`, { icon: '🎬', duration: 3500 });
       }
 
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Clear state only after models have had an opportunity to resolve
+      if (models.length > 0) {
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      }
     }
-  }, [location.state, models]);
+  }, [location.state, location.search, models]);
   
   // Lists
   const [recentVideos, setRecentVideos] = useState([]);
@@ -807,14 +827,14 @@ export default function Studio() {
                 </p>
               </div>
 
-              {/* Ephemeral Storage Retention Badge */}
-              <div className="p-2 rounded-xl bg-emerald-500/8 border border-emerald-500/15 space-y-1">
-                <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[9px] uppercase tracking-wider">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
-                  <span>7-Day Privacy Retention</span>
+              {/* Likeness Rights & Regulatory Compliance Badge */}
+              <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 space-y-1">
+                <div className="flex items-center gap-1.5 text-primary-hover font-bold text-[9px] uppercase tracking-wider">
+                  <ShieldCheck className="w-3.5 h-3.5 text-primary-hover shrink-0" />
+                  <span>Likeness Consent & Compliance</span>
                 </div>
-                <p className="text-[8.5px] text-white/40 leading-tight">
-                  Reference videos and images are automatically purged after 7 days. Your final creation stays permanently.
+                <p className="text-[8.5px] text-white/60 leading-tight">
+                  By submitting motion swaps, you affirm you hold necessary rights or consent from the depicted individual in accordance with our <Link to="/terms" target="_blank" className="text-primary-hover hover:underline font-semibold">Terms of Service</Link>.
                 </p>
               </div>
             </div>

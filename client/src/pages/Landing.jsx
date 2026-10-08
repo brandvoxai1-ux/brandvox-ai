@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import {
   Film,
@@ -52,14 +52,26 @@ export default function Landing() {
   const pricingPacks = [
     { id: 'starter', name: 'Starter Pack', price: '₹99', credits: '99.00 🪙', bonus: null, desc: 'Perfect for beginners starting to explore.', features: ['99.00 🪙 Balance', 'Full Video & Image Access', 'Standard Generations Queue'] },
     { id: 'creator', name: 'Creator Pack', price: '₹249', credits: '274.00 🪙', bonus: '10% Bonus', desc: 'Most popular option for designers.', features: ['274.00 🪙 Balance', 'Watermark-Free Downloads', 'Priority Generations Queue'] },
-    { id: 'pro', name: 'Pro Pack', price: '₹499', credits: '574.00 🪙', bonus: '15% Bonus', desc: 'Unlock premium high-resolution options.', features: ['574.00 🪙 Balance', 'All features included', '24/7 Priority Support'] },
-    { id: 'studio', name: 'Studio Pack', price: '₹999', credits: '1,199.00 🪙', bonus: '20% Bonus', desc: 'Ultimate package for agency work.', features: ['1,199.00 🪙 Balance', 'Pristine 1080p outputs', 'Custom aspect integrations', 'Immediate priority execution'] }
+    { id: 'pro', name: 'Pro Pack', price: '₹499', credits: '574.00 🪙', bonus: '15% Bonus', desc: 'Unlock premium high-resolution options.', features: ['574.00 🪙 Balance', 'All features included', 'Fast Support Ticket SLA'] },
+    { id: 'studio', name: 'Studio Pack', price: '₹999', credits: '1,199.00 🪙', bonus: '20% Bonus', desc: 'Ultimate package for agency work.', features: ['1,199.00 🪙 Balance', 'Crisp HD Video Exports', 'Custom aspect integrations', 'Immediate priority execution'] }
   ];
 
-  const testimonials = [
-    { initials: 'AK', name: 'Aarav Kumar', role: 'Motion Lead', text: 'BrandVox AI has completely transformed how our design team drafts pitches. Switching between Hailuo and Kling takes seconds!' },
-    { initials: 'NP', name: 'Neha Patel', role: 'Agency Director', text: 'Pricing in INR without monthly lock-ins is a total game-changer. Instant UPI top-ups make credit reloads seamless.' },
-    { initials: 'RS', name: 'Rohan Sharma', role: 'Content Creator', text: 'The cinematic output on MiniMax Hailuo is jaw-dropping. Highly recommend the Creator and Pro packages!' }
+  const platformCapabilities = [
+    {
+      icon: Zap,
+      title: 'Multi-Model SOTA Engine',
+      desc: 'Seamlessly toggle between WAN 2.2, Kling 3.0 Omni, and Seedance 2.0 to find the ideal motion dynamics for every creative prompt.'
+    },
+    {
+      icon: Film,
+      title: 'V2V Character Motion Transfer',
+      desc: 'Retarget complex human choreography, sports motion, and facial acting directly onto new avatars with high keyframe consistency.'
+    },
+    {
+      icon: Coins,
+      title: 'Transparent Pay-As-You-Go',
+      desc: 'Billed purely in Indian Rupees (INR) with instant UPI checkouts. Zero mandatory recurring monthly subscriptions.'
+    }
   ];
 
   return (
@@ -317,32 +329,35 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* 7. TESTIMONIALS */}
+      {/* 7. PRODUCTION CAPABILITIES */}
       <section className="px-6 md:px-12 py-24 bg-surface/30 border-t border-white/5">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-2xl md:text-3xl font-extrabold tracking-wide">
-              Loved by Global Motion Artists
+            <h2 className="text-2xl md:text-3xl font-extrabold tracking-wide text-white">
+              Built for Modern Motion Designers
             </h2>
+            <p className="text-xs text-white/50 uppercase tracking-widest font-semibold mt-2">
+              Next-Generation Generative AI Infrastructure
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map((test, i) => (
-              <div key={i} className="p-6 bg-surface border border-white/5 rounded-xl hover-scale flex flex-col justify-between space-y-6">
-                <p className="text-xs text-white/65 leading-relaxed font-semibold italic">
-                  "{test.text}"
-                </p>
-                <div className="flex items-center space-x-3.5">
-                  <div className="w-9 h-9 rounded-full bg-primary/20 text-primary-hover font-bold text-xs flex items-center justify-center border border-primary/20">
-                    {test.initials}
+            {platformCapabilities.map((cap, i) => {
+              const Icon = cap.icon;
+              return (
+                <div key={i} className="p-6 bg-surface border border-white/5 rounded-xl hover-scale flex flex-col justify-between space-y-4">
+                  <div className="p-3 w-fit rounded-xl bg-primary/15 text-primary-hover border border-primary/20">
+                    <Icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white tracking-wide">{test.name}</h4>
-                    <p className="text-[9px] text-white/40 uppercase font-black tracking-wider">{test.role}</p>
+                    <h3 className="text-sm font-bold text-white tracking-wide mb-1.5">{cap.title}</h3>
+                    <p className="text-xs text-white/60 leading-relaxed font-medium">
+                      {cap.desc}
+                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -381,17 +396,27 @@ export default function Landing() {
           </div>
 
           <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4">Legal</h4>
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-4">Legal & Compliance</h4>
             <ul className="space-y-2.5">
-              <li><span onClick={() => setActiveModal('privacy')} className="hover:text-white transition-colors cursor-pointer">Privacy Policy</span></li>
-              <li><span onClick={() => setActiveModal('terms')} className="hover:text-white transition-colors cursor-pointer">Terms of Service</span></li>
+              <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+              <li><Link to="/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link></li>
+              <li><Link to="/refund-policy" className="hover:text-white transition-colors">Refund & Cancellation</Link></li>
             </ul>
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between text-[11px]">
-          <span>© 2026 BrandVox AI. All rights reserved.</span>
-          <span className="mt-2 md:mt-0 text-white/20 font-medium">Billed in Indian Rupees (INR)</span>
+        <div className="max-w-6xl mx-auto border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between text-[11px] text-white/50 space-y-3 md:space-y-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-center sm:text-left">
+            <span>© 2026 BrandVox AI. All rights reserved.</span>
+            <span className="hidden sm:inline text-white/20">|</span>
+            <span>BrandVox AI SaaS Operations · Registered in India</span>
+          </div>
+          <div className="flex items-center space-x-4 text-white/40 font-medium">
+            <span>Billed in Indian Rupees (INR)</span>
+            <span>·</span>
+            <span>Grievance Desk: legal@brandvox.ai</span>
+          </div>
         </div>
       </footer>
 

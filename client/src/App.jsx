@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast';
 // Layouts
 import AppLayout from './components/layout/AppLayout';
 import AdminLayout from './components/layout/AdminLayout';
+import CookieBanner from './components/shared/CookieBanner';
 
 // Public Pages (Eagerly loaded for instant first paint)
 import Landing from './pages/Landing';
@@ -18,6 +19,12 @@ const Templates = lazy(() => import('./pages/Templates'));
 const Explore = lazy(() => import('./pages/Explore'));
 const Credits = lazy(() => import('./pages/Credits'));
 const Settings = lazy(() => import('./pages/Settings'));
+
+// Lazy-loaded Legal & Compliance Pages
+const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'));
+const CookiePolicy = lazy(() => import('./pages/legal/CookiePolicy'));
+const RefundPolicy = lazy(() => import('./pages/legal/RefundPolicy'));
 
 // Lazy-loaded Admin Pages (Code-split to isolate Recharts & Admin bundles)
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -95,6 +102,14 @@ export default function App() {
             {/* Public Views */}
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/cookies" element={<CookiePolicy />} />
+            <Route path="/cookie-policy" element={<CookiePolicy />} />
+            <Route path="/refunds" element={<RefundPolicy />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
 
             {/* User Protected Views */}
             <Route path="/studio" element={<ProtectedRoute><Studio /></ProtectedRoute>} />
@@ -116,6 +131,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        <CookieBanner />
       </Router>
 
       {/* Styled React Hot Toasts indicator notifications */}

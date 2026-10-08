@@ -129,6 +129,7 @@ export default function Sidebar({ toggleNotifications }) {
               <button
                 key={item.id}
                 onClick={() => handleNav(item)}
+                aria-label={item.label}
                 className={`relative group flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-200 ${
                   active
                     ? 'bg-primary text-white shadow-glow'
@@ -156,10 +157,11 @@ export default function Sidebar({ toggleNotifications }) {
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
+            aria-label="User profile and account settings"
             className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-indigo-500/30 text-white font-bold border border-white/10 overflow-hidden cursor-pointer hover:border-primary transition-all duration-200"
           >
             {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+              <img src={profile.avatar_url} alt={`${profile.full_name || 'User'} avatar`} className="w-full h-full object-cover" />
             ) : (
               <span>{profile?.full_name?.[0]?.toUpperCase() || 'U'}</span>
             )}
@@ -209,6 +211,7 @@ export default function Sidebar({ toggleNotifications }) {
             <button
               key={item.id}
               onClick={() => handleNav(item)}
+              aria-label={item.label}
               className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
                 active ? 'text-primary' : 'text-white/40 hover:text-white'
               }`}
@@ -227,6 +230,7 @@ export default function Sidebar({ toggleNotifications }) {
         {/* Mobile Profile Link */}
         <button
           onClick={() => navigate('/settings')}
+          aria-label="Account Settings"
           className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 ${
             location.pathname === '/settings' ? 'text-primary' : 'text-white/40 hover:text-white'
           }`}

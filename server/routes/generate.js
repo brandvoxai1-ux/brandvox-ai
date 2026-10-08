@@ -10,6 +10,7 @@ const { createNotification } = require('../services/notificationService');
 const { archiveVideo, archiveImage } = require('../services/storageService');
 const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
 const { enhanceAdPrompt, STYLE_PRESETS } = require('../services/promptEnhancer');
+const { validatePromptSafety } = require('../lib/moderation');
 
 /**
  * POST /api/generate
@@ -29,6 +30,11 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
   // 1. Inputs validation
   if (!prompt || prompt.trim().length === 0) {
     return res.status(400).json({ error: 'Please enter a detailed prompt describing your video.' });
+  }
+
+  const safetyCheck = validatePromptSafety(prompt);
+  if (!safetyCheck.allowed) {
+    return res.status(400).json({ error: safetyCheck.reason });
   }
 
   if (prompt.length > 2000) {
@@ -274,6 +280,12 @@ router.post('/image', authMiddleware, generationLimiter, async (req, res) => {
   if (!prompt || prompt.trim().length === 0) {
     return res.status(400).json({ error: 'Please enter a prompt describing your image.' });
   }
+
+  const safetyCheck = validatePromptSafety(prompt);
+  if (!safetyCheck.allowed) {
+    return res.status(400).json({ error: safetyCheck.reason });
+  }
+
   if (prompt.length > 2000) {
     return res.status(400).json({ error: 'Prompts cannot exceed 2000 characters.' });
   }
@@ -439,6 +451,13 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
 
   if (!target_character_url && (!prompt || prompt.trim().length === 0)) {
     return res.status(400).json({ error: 'Please provide either a target character image or a detailed character prompt.' });
+  }
+
+  if (prompt) {
+    const safetyCheck = validatePromptSafety(prompt);
+    if (!safetyCheck.allowed) {
+      return res.status(400).json({ error: safetyCheck.reason });
+    }
   }
 
   const selectedDuration = parseInt(duration) || 10;

@@ -22,7 +22,7 @@ export function Input({
       {label && generatedId && (
         <label 
           htmlFor={generatedId} 
-          className="text-xs font-bold text-white/50 uppercase tracking-wider"
+          className="text-xs font-bold text-white/75 uppercase tracking-wider"
         >
           {label}
         </label>
@@ -32,7 +32,7 @@ export function Input({
         id={generatedId}
         name={inputName}
         placeholder={placeholder}
-        className={`bg-surface-elevated text-white border border-white/10 rounded-lg px-4 py-2.5 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder-white/20 ${
+        className={`bg-surface-elevated text-white border border-white/10 rounded-lg px-4 py-2.5 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder-white/50 ${
           error ? 'border-error/60 focus:ring-error/20' : ''
         }`}
         {...props}
@@ -63,7 +63,7 @@ export function Textarea({
       {label && generatedId && (
         <label 
           htmlFor={generatedId} 
-          className="text-xs font-bold text-white/50 uppercase tracking-wider"
+          className="text-xs font-bold text-white/75 uppercase tracking-wider"
         >
           {label}
         </label>
@@ -73,7 +73,7 @@ export function Textarea({
         name={textareaName}
         placeholder={placeholder}
         rows={rows}
-        className={`bg-surface-elevated text-white border border-white/10 rounded-lg px-4 py-3 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder-white/20 resize-none ${
+        className={`bg-surface-elevated text-white border border-white/10 rounded-lg px-4 py-3 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder-white/50 resize-none ${
           error ? 'border-error/60 focus:ring-error/20' : ''
         }`}
         {...props}

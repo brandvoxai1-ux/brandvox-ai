@@ -46,8 +46,16 @@ app.use('/api/credits', creditsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/upload', uploadRouter);
 
+const memoryCache = require('./lib/cache');
+
 // Models list endpoint (proxies to database using service credentials to avoid direct RLS/CORS issues)
 app.get('/api/models', async (req, res) => {
+  const cached = memoryCache.get('active_models');
+  if (cached) {
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.json(cached);
+  }
+
   const supabase = require('./lib/supabase');
   try {
     const { data: models, error } = await supabase
@@ -57,6 +65,8 @@ app.get('/api/models', async (req, res) => {
       .order('price_per_second', { ascending: true });
 
     if (error) throw error;
+    memoryCache.set('active_models', models, 300);
+    res.setHeader('Cache-Control', 'public, max-age=300');
     res.json(models);
   } catch (err) {
     console.error('[models] Error fetching models:', err);

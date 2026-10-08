@@ -69,17 +69,18 @@ export default function MediaModal({
   const handleRemix = () => {
     onClose();
     const isImage = media.generation_type === 'image' || (media.video_url && /\.(jpg|jpeg|png|webp)($|\?)/i.test(media.video_url));
-    const targetMode = isImage ? 'image' : 'swap';
-    navigate(`/studio?mode=${targetMode}`, {
+    const isSwap = media.generation_type === 'swap';
+    const targetMode = isImage ? 'image' : (isSwap ? 'swap' : 'video');
+    navigate(`/studio?mode=${targetMode}&remix=${media.id || Date.now()}`, {
       state: {
         remixMedia: media,
         prompt: media.prompt || '',
         remixPrompt: media.prompt || '',
         title: media.title ? `Remix: ${media.title}` : 'Remix Creation',
-        model: isImage ? (media.model_id || 'ideogram-v2') : (['kling-3-omni', 'seedance-2'].includes(media.model_id) ? media.model_id : 'kling-3-omni'),
+        model: media.model_id,
         model_id: media.model_id,
         aspectRatio: media.aspect_ratio || '16:9',
-        duration: media.duration ? String(media.duration) : '5',
+        duration: media.duration ? String(media.duration) : '6',
         mediaType: targetMode
       }
     });
@@ -124,6 +125,7 @@ export default function MediaModal({
             )}
             <button
               onClick={handleDownload}
+              aria-label={watermarkRequired ? "Download video with watermark" : "Download high resolution video"}
               className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all shadow-premium"
               title="Download asset"
             >
@@ -132,6 +134,7 @@ export default function MediaModal({
             </button>
             <button
               onClick={onClose}
+              aria-label="Close media modal"
               className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-white/60 hover:text-white transition-colors"
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -177,7 +180,8 @@ export default function MediaModal({
                 </span>
                 <button
                   onClick={handleCopyPrompt}
-                  className="flex items-center space-x-1 text-[10px] text-white/40 hover:text-white transition-colors"
+                  aria-label="Copy prompt text to clipboard"
+                  className="flex items-center space-x-1 text-[10px] text-white/50 hover:text-white transition-colors"
                 >
                   <Copy className="w-3 h-3" />
                   <span>Copy</span>

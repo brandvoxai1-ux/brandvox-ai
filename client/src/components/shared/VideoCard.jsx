@@ -302,6 +302,7 @@ export default function VideoCard({
               {/* Download — locked behind paid tier */}
               <button
                 onClick={handleDownload}
+                aria-label={watermarkRequired ? 'Download asset with watermark' : 'Download clean asset'}
                 className={`p-1.5 rounded-lg transition-colors cursor-pointer group/dl relative ${
                   watermarkRequired
                     ? 'text-white/20 hover:text-warning hover:bg-warning/5'
@@ -319,6 +320,7 @@ export default function VideoCard({
                 <button
                   onClick={handleShareClick}
                   disabled={sharing}
+                  aria-label={video.is_public ? 'Set creation to private' : 'Set creation to public'}
                   className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                     video.is_public ? 'text-success hover:bg-success/5' : 'text-white/55 hover:text-white hover:bg-white/5'
                   }`}
@@ -331,6 +333,7 @@ export default function VideoCard({
               {video.is_public && (
                 <button
                   onClick={handleCopyLink}
+                  aria-label="Copy public share URL"
                   className="p-1.5 rounded-lg text-primary-hover hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
                   title="Copy Share Link"
                 >
@@ -343,6 +346,7 @@ export default function VideoCard({
               <button
                 onClick={handleDelete}
                 disabled={deleting}
+                aria-label="Delete video generation"
                 className="p-1.5 rounded-lg text-error/60 hover:text-error hover:bg-white/5 transition-colors cursor-pointer"
                 title="Delete Generation"
               >

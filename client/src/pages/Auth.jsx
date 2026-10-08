@@ -1,6 +1,6 @@
 // client/src/pages/Auth.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -213,10 +213,15 @@ export default function Auth() {
                 onChange={(e) => setAgreeTerms(e.target.checked)}
                 className="mt-0.5 accent-primary rounded bg-surface border-white/10"
               />
-              <label htmlFor="agree" className="text-xs text-white/50 leading-relaxed font-semibold">
+              <label htmlFor="agree" className="text-xs text-white/60 leading-relaxed font-semibold">
                 I agree to the{' '}
-                <span className="text-white hover:underline cursor-pointer">Terms of Service</span> and{' '}
-                <span className="text-white hover:underline cursor-pointer">Privacy Policy</span>.
+                <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-white hover:underline underline-offset-2">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-white hover:underline underline-offset-2">
+                  Privacy Policy
+                </Link>.
               </label>
             </div>
           )}
