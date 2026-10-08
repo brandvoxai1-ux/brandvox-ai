@@ -1017,8 +1017,8 @@ export default function Studio() {
                   <span>Duration</span>
                   <span className="text-primary-hover font-black">{duration}s</span>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5 bg-white/5 p-1 rounded-xl border border-white/8">
-                  {[4, 6, 8, 10].map((sec) => (
+                <div className="grid grid-cols-6 gap-1 bg-white/5 p-1 rounded-xl border border-white/8">
+                  {[4, 6, 8, 10, 12, 15].map((sec) => (
                     <button
                       key={sec}
                       type="button"
