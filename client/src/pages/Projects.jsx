@@ -16,6 +16,7 @@ export default function Projects() {
   const {
     fetchGenerations,
     deleteGeneration,
+    cancelGeneration,
     updateGeneration
   } = useGeneration();
 
@@ -114,6 +115,16 @@ export default function Projects() {
       setVideos(prev => prev.filter(v => v.id !== id));
     } catch (err) {
       throw err;
+    }
+  };
+
+  const handleVideoCancel = async (id) => {
+    try {
+      await cancelGeneration(id);
+      setVideos(prev => prev.map(v => v.id === id ? { ...v, status: 'failed', error_message: 'Generation cancelled by user.' } : v));
+      toast.success('Generation cancelled. Credits refunded.');
+    } catch (err) {
+      toast.error(err.message || 'Failed to cancel generation.');
     }
   };
 
@@ -234,6 +245,7 @@ export default function Projects() {
                   watermarkRequired={watermarkRequired}
                   onPlay={(vid) => setSelectedMedia(vid)}
                   onDelete={handleVideoDelete}
+                  onCancel={handleVideoCancel}
                   onToggleShare={handleShareState}
                   onRename={handleTitleRename}
                 />

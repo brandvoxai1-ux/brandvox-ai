@@ -1113,6 +1113,43 @@ router.patch('/:id', authMiddleware, async (req, res) => {
  */
 router.delete('/:id', authMiddleware, async (req, res) => {
   try {
+    const { data: gen } = await supabase
+      .from('generations')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (!gen) {
+      return res.status(404).json({ error: 'Generation not found or access denied.' });
+    }
+
+    // If generation is currently in-flight, cancel Replicate task and refund credits
+    if (gen.status === 'processing' || gen.status === 'pending') {
+      if (gen.fal_request_id) {
+        try {
+          await replicateService.cancelPrediction(gen.fal_request_id);
+        } catch (repErr) {
+          console.warn(`[Delete/Cancel] Could not cancel Replicate prediction ${gen.fal_request_id}:`, repErr.message);
+        }
+      }
+      const refundCost = parseFloat(gen.cost || 0);
+      if (refundCost > 0) {
+        try {
+          await creditService.addCredits(
+            req.user.id,
+            refundCost,
+            `Refund for deleted generation ${gen.id}`,
+            `delete-refund-${gen.id}`,
+            `delete-refund-${gen.id}`,
+            'refund'
+          );
+        } catch (credErr) {
+          console.warn('[Delete/Cancel] Credit refund error:', credErr.message);
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('generations')
       .delete()

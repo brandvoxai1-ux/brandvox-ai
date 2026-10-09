@@ -36,6 +36,24 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
     setFileName(file.name);
     const localPreview = URL.createObjectURL(file);
     setPreview(localPreview);
+
+    // Non-blocking client-side duration probe to notify user if auto-trimming will occur
+    try {
+      const probeEl = document.createElement('video');
+      probeEl.preload = 'metadata';
+      probeEl.src = localPreview;
+      probeEl.onloadedmetadata = () => {
+        if (probeEl.duration > 9.9) {
+          toast('Notice: Video is longer than 10s — will be automatically trimmed to 9.8s for Kling AI compatibility.', {
+            icon: '✂️',
+            duration: 5000
+          });
+        }
+      };
+    } catch {
+      // Non-critical probe failure
+    }
+
     setUploading(true);
 
     try {

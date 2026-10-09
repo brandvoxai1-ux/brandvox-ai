@@ -1,6 +1,6 @@
 // client/src/components/shared/VideoCard.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Download, Trash, Share2, Globe, Lock, AlertCircle, Info, Crown } from 'lucide-react';
+import { Play, Download, Trash, Share2, Globe, Lock, AlertCircle, Info, Crown, XCircle } from 'lucide-react';
 import { formatDate, formatCredits } from '../../lib/utils';
 import { Badge } from '../ui/Badge';
 import api from '../../lib/api';
@@ -62,10 +62,12 @@ export default function VideoCard({
   onDelete = null,
   onToggleShare = null,
   onRename = null,
+  onCancel = null,
   showActions = true
 }) {
   const [hovered, setHovered] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [thumbnail, setThumbnail] = useState(
     // Use existing thumbnail if it's NOT the stale placeholder
@@ -141,6 +143,26 @@ export default function VideoCard({
         toast.error('Delete failed.');
       } finally {
         setDeleting(false);
+      }
+    }
+  };
+
+  const handleCancel = async (e) => {
+    e.stopPropagation();
+    if (window.confirm('Cancel this ongoing generation and refund credits to your balance?')) {
+      setCancelling(true);
+      try {
+        if (onCancel) {
+          await onCancel(video.id);
+        } else {
+          await api.post(`/generate/${video.id}/cancel`);
+          toast.success('Generation cancelled. Credits refunded.');
+          if (onDelete) onDelete(video.id);
+        }
+      } catch (err) {
+        toast.error(err?.response?.data?.error || err.message || 'Failed to cancel generation.');
+      } finally {
+        setCancelling(false);
       }
     }
   };
@@ -295,63 +317,99 @@ export default function VideoCard({
         </div>
 
         {/* ── Action Buttons ──────────────────────────────────── */}
-        {showActions && video.status === 'completed' && (
+        {showActions && (
           <div className="flex items-center justify-between border-t border-white/5 mt-3 pt-3">
-            <div className="flex space-x-1.5">
+            {video.status === 'completed' ? (
+              <>
+                <div className="flex space-x-1.5">
+                  {/* Download — locked behind paid tier */}
+                  <button
+                    onClick={handleDownload}
+                    aria-label={watermarkRequired ? 'Download asset with watermark' : 'Download clean asset'}
+                    className={`p-1.5 rounded-lg transition-colors cursor-pointer group/dl relative ${
+                      watermarkRequired
+                        ? 'text-white/20 hover:text-warning hover:bg-warning/5'
+                        : 'text-white/55 hover:text-white hover:bg-white/5'
+                    }`}
+                    title={watermarkRequired ? 'Purchase credits to download watermark-free' : 'Download MP4'}
+                  >
+                    {watermarkRequired
+                      ? <Crown className="w-4 h-4" />
+                      : <Download className="w-4 h-4" />
+                    }
+                  </button>
 
-              {/* Download — locked behind paid tier */}
-              <button
-                onClick={handleDownload}
-                aria-label={watermarkRequired ? 'Download asset with watermark' : 'Download clean asset'}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer group/dl relative ${
-                  watermarkRequired
-                    ? 'text-white/20 hover:text-warning hover:bg-warning/5'
-                    : 'text-white/55 hover:text-white hover:bg-white/5'
-                }`}
-                title={watermarkRequired ? 'Purchase credits to download watermark-free' : 'Download MP4'}
-              >
-                {watermarkRequired
-                  ? <Crown className="w-4 h-4" />
-                  : <Download className="w-4 h-4" />
-                }
-              </button>
+                  {onToggleShare && (
+                    <button
+                      onClick={handleShareClick}
+                      disabled={sharing}
+                      aria-label={video.is_public ? 'Set creation to private' : 'Set creation to public'}
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                        video.is_public ? 'text-success hover:bg-success/5' : 'text-white/55 hover:text-white hover:bg-white/5'
+                      }`}
+                      title={video.is_public ? 'Set Private' : 'Make Public'}
+                    >
+                      {video.is_public ? <Globe className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                    </button>
+                  )}
 
-              {onToggleShare && (
+                  {video.is_public && (
+                    <button
+                      onClick={handleCopyLink}
+                      aria-label="Copy public share URL"
+                      className="p-1.5 rounded-lg text-primary-hover hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                      title="Copy Share Link"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {onDelete && (
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    aria-label="Delete video generation"
+                    className="p-1.5 rounded-lg text-error/60 hover:text-error hover:bg-white/5 transition-colors cursor-pointer"
+                    title="Delete Generation"
+                  >
+                    <Trash className="w-4 h-4" />
+                  </button>
+                )}
+              </>
+            ) : video.status === 'processing' ? (
+              <div className="flex items-center justify-between w-full">
+                <span className="text-[10px] text-primary/70 animate-pulse font-medium">In Progress...</span>
                 <button
-                  onClick={handleShareClick}
-                  disabled={sharing}
-                  aria-label={video.is_public ? 'Set creation to private' : 'Set creation to public'}
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                    video.is_public ? 'text-success hover:bg-success/5' : 'text-white/55 hover:text-white hover:bg-white/5'
-                  }`}
-                  title={video.is_public ? 'Set Private' : 'Make Public'}
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  aria-label="Cancel ongoing generation"
+                  className="px-2 py-1 rounded-lg text-[10px] font-bold text-error/80 hover:text-error hover:bg-error/10 border border-error/20 transition-colors cursor-pointer flex items-center gap-1"
+                  title="Cancel generation & refund credits"
                 >
-                  {video.is_public ? <Globe className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>{cancelling ? 'Cancelling...' : 'Cancel & Refund'}</span>
                 </button>
-              )}
-
-              {video.is_public && (
-                <button
-                  onClick={handleCopyLink}
-                  aria-label="Copy public share URL"
-                  className="p-1.5 rounded-lg text-primary-hover hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
-                  title="Copy Share Link"
-                >
-                  <Share2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {onDelete && (
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                aria-label="Delete video generation"
-                className="p-1.5 rounded-lg text-error/60 hover:text-error hover:bg-white/5 transition-colors cursor-pointer"
-                title="Delete Generation"
-              >
-                <Trash className="w-4 h-4" />
-              </button>
+              </div>
+            ) : (
+              /* Failed or queue state — allow dismissal / deletion */
+              <div className="flex items-center justify-between w-full">
+                <span className="text-[10px] text-error/60 font-medium">
+                  {video.status === 'failed' ? 'Failed job' : 'Queued'}
+                </span>
+                {onDelete && (
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    aria-label="Dismiss failed creation"
+                    className="p-1.5 rounded-lg text-error/60 hover:text-error hover:bg-white/5 transition-colors cursor-pointer flex items-center gap-1 text-[10px]"
+                    title="Dismiss / Delete record"
+                  >
+                    <Trash className="w-3.5 h-3.5" />
+                    <span>Dismiss</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

@@ -58,7 +58,7 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
     console.log(`[videoProcessor] Reference video probed: ${width}x${height}, duration: ${duration}s`);
 
     const needsUpscale = width < 720 || height < 720;
-    const needsTrim = duration > 10.5;
+    const needsTrim = duration > 9.9;
     const needsLoop = duration < 3.0;
 
     if (!needsUpscale && !needsTrim && !needsLoop) {
@@ -82,7 +82,7 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
     const filter = `scale=${targetW}:${targetH}:flags=bicubic`;
     const loopCount = needsLoop ? Math.max(1, Math.ceil(3.5 / Math.max(0.5, duration)) - 1) : 0;
     const loopArg = loopCount > 0 ? `-stream_loop ${loopCount} ` : '';
-    const durationLimit = needsTrim ? '-t 10' : (needsLoop ? '-t 4' : '');
+    const durationLimit = needsTrim ? '-t 9.8' : (needsLoop ? '-t 4' : '');
     const ffmpegCmd = `ffmpeg -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 19 -c:a aac -b:a 192k "${outputPath}"`;
 
     console.log(`[videoProcessor] Running FFmpeg optimization: ${ffmpegCmd}`);

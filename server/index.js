@@ -10,6 +10,7 @@ const creditsRouter = require('./routes/credits');
 const adminRouter = require('./routes/admin');
 const uploadRouter = require('./routes/upload');
 const { initCleanupService } = require('./services/cleanupService');
+const { initStaleWorker } = require('./services/staleWorker');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -136,6 +137,7 @@ if (!process.env.NETLIFY && !process.env.AWS_LAMBDA_FUNCTION_VERSION && !process
     // Mount 7-day ephemeral storage cleanup worker
     try {
       initCleanupService();
+      initStaleWorker();
     } catch (cleanErr) {
       console.error('[CleanupService] Failed to start cleanup worker:', cleanErr.message);
     }
