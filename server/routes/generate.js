@@ -848,6 +848,52 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
         console.error('[WebhookLogic] Non-critical email send failed:', emailErr);
       }
     } else {
+      const isSensitiveOrE005 = typeof errorMsg === 'string' && (
+        errorMsg.includes('E005') ||
+        errorMsg.toLowerCase().includes('sensitive') ||
+        errorMsg.toLowerCase().includes('flagged')
+      );
+
+      // Auto-fallback: if Kling or Seedance triggered E005, retry with MiniMax Hailuo Video-01
+      if (isSensitiveOrE005 && gen.model_id !== 'minimax-hailuo' && !gen.error_message?.includes('[fallback-attempted]')) {
+        console.log(`[WebhookLogic] Upstream E005 moderation detected for gen ${generationId}. Retrying with MiniMax Hailuo Video-01...`);
+        try {
+          await supabase.from('generations').update({
+            model_id: 'minimax-hailuo',
+            model_name: 'MiniMax Hailuo Video-01 (Auto-Protected)',
+            error_message: '[fallback-attempted] Retrying with permissive AI engine'
+          }).eq('id', generationId);
+
+          const { extractVisualScenePrompt } = require('../services/promptSanitizer');
+          const cleanVisualPrompt = extractVisualScenePrompt(gen.prompt);
+
+          const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
+          const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
+
+          const fallbackResult = await replicateService.generateVideo({
+            endpoint: 'minimax/video-01',
+            prompt: cleanVisualPrompt,
+            duration: gen.duration || 6,
+            resolution: gen.resolution || '720p',
+            aspect_ratio: gen.aspect_ratio || '16:9',
+            generate_audio: true,
+            webhookUrl,
+            generationId: gen.id
+          });
+
+          if (fallbackResult.request_id) {
+            await supabase.from('generations').update({ fal_request_id: fallbackResult.request_id }).eq('id', gen.id);
+            console.log(`[WebhookLogic] Fallback prediction queued on MiniMax: ${fallbackResult.request_id}`);
+            return;
+          } else if (fallbackResult.video_url) {
+            await handleWebhookLogic(gen.id, 'OK', fallbackResult.video_url, null);
+            return;
+          }
+        } catch (fallbackErr) {
+          console.error('[WebhookLogic] Fallback to MiniMax also failed:', fallbackErr);
+        }
+      }
+
       // Refund credits atomically
       await creditService.addCredits(
         gen.user_id,

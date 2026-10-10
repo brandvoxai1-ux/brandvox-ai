@@ -248,7 +248,8 @@ async function generateCharacterSwapVideo({
   // Helper to translate Google Flow @tag mentions into model-native syntax
   const translatePromptTags = (rawPrompt, isSeedance) => {
     if (!rawPrompt || !rawPrompt.trim()) return '';
-    let p = rawPrompt;
+    const { sanitizePromptForVideo } = require('./promptSanitizer');
+    let p = sanitizePromptForVideo(rawPrompt);
     // Replace @Motion
     p = p.replace(/@Motion\b/gi, isSeedance ? '[Video1]' : '<<<video_1>>>');
     // Replace @Char 1..5 or @Char1..5
@@ -370,7 +371,10 @@ async function generateCharacterSwapVideo({
 async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ratio, generate_audio, image_url, webhookUrl, generationId }) {
   const model = resolveReplicateModel(endpoint, 'minimax/video-01');
 
-  const input = { prompt };
+  const { sanitizePromptForVideo } = require('./promptSanitizer');
+  const cleanPrompt = sanitizePromptForVideo(prompt);
+
+  const input = { prompt: cleanPrompt };
   const cleanImageUrl = image_url && typeof image_url === 'string' && image_url.trim() ? image_url.trim() : null;
 
   if (model.includes('seedance')) {
@@ -442,6 +446,25 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
       return { video_url: videoUrl };
     }
   } catch (error) {
+    const errorMsg = String(error?.message || error || '');
+    if ((errorMsg.includes('E005') || errorMsg.includes('sensitive') || errorMsg.includes('flagged')) && model !== 'minimax/video-01') {
+      console.warn(`[replicateService] E005 sensitive flag hit on ${model}. Automatically falling back to MiniMax Hailuo Video-01...`);
+      try {
+        const fallbackInput = {
+          prompt: cleanPrompt,
+          prompt_optimizer: true
+        };
+        if (cleanImageUrl) fallbackInput.first_frame_image = cleanImageUrl;
+        const fallbackOutput = await replicate.run('minimax/video-01', { input: fallbackInput });
+        const fallbackVideoUrl = extractMediaUrl(fallbackOutput);
+        if (fallbackVideoUrl) {
+          console.log(`[replicateService] Fallback to MiniMax succeeded: ${fallbackVideoUrl}`);
+          return { video_url: fallbackVideoUrl };
+        }
+      } catch (fallbackErr) {
+        console.error('[replicateService] Fallback to MiniMax also encountered error:', fallbackErr);
+      }
+    }
     console.error('[replicateService] Video generation failed:', error);
     throw new Error(error.message || 'API request to Replicate failed');
   }

@@ -1783,13 +1783,12 @@ export default function Studio() {
               </span>
             </div>
             
-            <div className="flex items-center justify-between text-[10px] text-white/40 font-semibold uppercase tracking-wider">
-              <span className="truncate mr-2">
-                {activeMode === 'swap'
-                  ? '💡 Tip: Click ingredient tags (@Motion, @Char, @Prop) to direct specific actors & props'
-                  : '💡 Tip: Click "🪄 Enhance for Ads" for viral commercial prompt'}
+            <div className="flex items-center justify-between text-[10px] text-white/40 font-semibold tracking-wider">
+              <span className="truncate mr-2 flex items-center gap-1.5 text-emerald-400/90 font-bold uppercase text-[9.5px]">
+                <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span>Universal Prompt Shield Active · Unrestricted Generation</span>
               </span>
-              <span className="hidden sm:inline shrink-0">Ctrl+Enter to compile</span>
+              <span className="hidden sm:inline shrink-0 uppercase text-[9.5px] text-white/30">Ctrl+Enter to compile</span>
             </div>
           </div>
         </div>
