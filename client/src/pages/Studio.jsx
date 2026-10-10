@@ -39,7 +39,8 @@ import {
   SlidersHorizontal,
   Plus,
   Trash2,
-  Users
+  Users,
+  Camera
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -95,6 +96,30 @@ export default function Studio() {
   }); // Image-to-Image remix reference photo
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false); // Mobile slide-up drawer
   const [propImageUrl, setPropImageUrl] = useState(''); // Optional Object/Prop ingredient
+  const [selectedCamera, setSelectedCamera] = useState(null);
+
+  const cameraPresets = [
+    { id: 'dolly', label: '🎥 Dolly Push', text: 'cinematic slow dolly push-in' },
+    { id: 'orbit', label: '🔄 360 Orbit', text: 'smooth 360 rotational orbit around subject' },
+    { id: 'pan', label: '↔️ Pan', text: 'fluid horizontal camera pan' },
+    { id: 'wide', label: '📐 Wide Pullback', text: 'dramatic wide-angle pullback reveal' },
+    { id: 'crane', label: '⬆️ Crane Up', text: 'sweeping vertical crane elevation shot' }
+  ];
+
+  const handleToggleCamera = (preset) => {
+    if (selectedCamera === preset.id) {
+      setSelectedCamera(null);
+      setPromptText(prev => prev.replace(new RegExp(`,?\\s*${preset.text}`, 'gi'), '').trim());
+    } else {
+      const prevPreset = cameraPresets.find(c => c.id === selectedCamera);
+      let updated = promptText;
+      if (prevPreset) {
+        updated = updated.replace(new RegExp(`,?\\s*${prevPreset.text}`, 'gi'), '').trim();
+      }
+      setSelectedCamera(preset.id);
+      setPromptText(updated ? `${updated}, ${preset.text}` : preset.text);
+    }
+  };
 
   // Multi-Character Swap state (supports 1 to 5 characters with role labels)
   const [swapCharacters, setSwapCharacters] = useState(() => {
@@ -794,9 +819,9 @@ export default function Studio() {
         {/* Top-level creator mode: Video | Swap (V2V) | Image */}
           <div className="flex bg-surface-elevated p-0.5 rounded-lg border border-white/5 text-[9.5px] font-bold uppercase tracking-wider">
             {[
-              { id: 'video', label: 'Video', icon: Film },
-              { id: 'swap', label: 'Ingredients', icon: Users },
-              { id: 'image', label: 'Image', icon: Sparkles }
+              { id: 'video', label: 'Cinema Video', icon: Film },
+              { id: 'swap', label: 'Recast (Swap)', icon: Users },
+              { id: 'image', label: 'Image Studio', icon: Sparkles }
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -1692,6 +1717,31 @@ export default function Studio() {
               </button>
             </div>
 
+            {/* Higgsfield Camera Motion Ribbon */}
+            {(activeMode === 'video' || activeMode === 'swap') && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-white/5 text-[9.5px]">
+                <span className="font-black uppercase text-primary tracking-wider shrink-0 flex items-center gap-1 mr-0.5">
+                  <Camera className="w-3 h-3 text-primary" />
+                  Camera Motion:
+                </span>
+                {cameraPresets.map((cam) => (
+                  <button
+                    key={cam.id}
+                    type="button"
+                    onClick={() => handleToggleCamera(cam)}
+                    className={`px-2 py-0.5 rounded-md font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                      selectedCamera === cam.id
+                        ? 'bg-primary text-white border-primary shadow-xs'
+                        : 'bg-white/5 text-white/60 hover:text-white border-white/10 hover:bg-white/10'
+                    }`}
+                    title={cam.text}
+                  >
+                    <span>{cam.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Google Flow Ingredients Quick-Tag Chips (Ingredients Mode) */}
             {activeMode === 'swap' && (
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-white/5 text-[9.5px]">
@@ -1767,10 +1817,10 @@ export default function Studio() {
                 ref={promptRef}
                 placeholder={
                   activeMode === 'swap'
-                    ? "Direct your scene with ingredients (e.g. '@Char1 dressed as warrior holding @Prop, perfectly matching @Motion choreography')..."
+                    ? "Describe scene direction, lighting, or action (e.g. 'Hero in red jacket walking in vibrant street') — or leave empty for direct motion transfer..."
                     : activeMode === 'image'
                     ? "Describe your visual ad idea in rich detail (e.g. Luxury perfume bottle on marble, soft lighting)..."
-                    : "Describe your commercial scene — product actions, camera shifts, and moody lighting..."
+                    : "Describe your cinematic scene — subject, actions, camera shifts, and moody lighting..."
                 }
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}

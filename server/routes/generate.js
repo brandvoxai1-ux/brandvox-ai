@@ -600,8 +600,8 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
         const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
         const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
 
-        // Ensure reference video is at least 720px per side for Replicate Kling Omni requirement
-        const readyVideoUrl = await ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase);
+        // Direct GPU cloud pass-through: pass CDN video URL straight to Replicate (< 400ms dispatch)
+        const readyVideoUrl = source_video_url;
 
         const result = await replicateService.generateCharacterSwapVideo({
           endpoint: model.fal_endpoint,
