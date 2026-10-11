@@ -432,8 +432,8 @@ export default function Studio() {
       if (!selectedModel.supported_resolutions?.includes(resolution)) {
         setResolution(selectedModel.supported_resolutions?.[0] || '720p');
       }
-      // Adjust duration limit (support up to 15 seconds)
-      const maxAllowed = Math.max(15, Number(selectedModel.max_duration) || 15);
+      // Adjust duration limit (support up to 30s for models like Seedance 2.5)
+      const maxAllowed = Math.max(30, Number(selectedModel.max_duration) || 30);
       if (duration > maxAllowed) {
         setDuration(maxAllowed);
       }

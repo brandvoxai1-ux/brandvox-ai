@@ -69,7 +69,7 @@ router.post('/image', authMiddleware, upload.single('file'), async (req, res) =>
 const videoUpload = multer({
   storage,
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50 MB max
+    fileSize: 200 * 1024 * 1024 // 200 MB max for videos up to 30s+ in high quality
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime'];

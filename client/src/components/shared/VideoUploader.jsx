@@ -28,8 +28,8 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
       return;
     }
 
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error('Source video must be under 50 MB.');
+    if (file.size > 200 * 1024 * 1024) {
+      toast.error('Source video must be under 200 MB.');
       return;
     }
 
@@ -37,7 +37,7 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
     const localPreview = URL.createObjectURL(file);
     setPreview(localPreview);
 
-    // Non-blocking client-side duration probe to notify user if auto-trimming will occur
+    // Non-blocking client-side duration probe
     try {
       const probeEl = document.createElement('video');
       probeEl.preload = 'metadata';
@@ -48,12 +48,6 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
         if (w > 0 && h > 0 && (w < 720 || h < 720)) {
           toast(`Notice: Video (${w}×${h}) will be auto-conformed to 720p+ HD for AI compatibility.`, {
             icon: '⚡',
-            duration: 4000
-          });
-        }
-        if (probeEl.duration > 9.9) {
-          toast('Notice: Video is longer than 10s — will be automatically trimmed to 9.8s for AI compatibility.', {
-            icon: '✂️',
             duration: 4000
           });
         }
@@ -183,7 +177,7 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
                 Choose Source Video File
               </p>
               <p className="text-[9px] text-white/40 mt-0.5">
-                Drag & drop or click to browse (MP4, WebM, MOV · max 50MB)
+                Drag & drop or click to browse (MP4, WebM, MOV · max 200MB · up to 30s+)
               </p>
             </div>
           </div>

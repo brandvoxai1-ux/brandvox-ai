@@ -55,14 +55,15 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
     }
 
     const { width, height, duration } = info;
-    console.log(`[videoProcessor] Reference video probed: ${width}x${height}, duration: ${duration}s`);
+    console.log(`[videoProcessor] Reference video probed: ${width}x${height}, duration: ${duration}s (zero-trimming preservation active)`);
 
     const needsUpscale = width < 720 || height < 720;
-    const needsTrim = duration > 9.9;
-    const needsLoop = duration < 3.0;
+    // We strictly DO NOT trim videos. Source videos up to 30s+ remain untrimmed.
+    // Only loop if video is excessively short (< 2.0s) so models don't fail on tiny sub-second clips.
+    const needsLoop = duration < 2.0;
 
-    if (!needsUpscale && !needsTrim && !needsLoop) {
-      console.log('[videoProcessor] Video already satisfies Replicate 720px+ and 3–10s requirements.');
+    if (!needsUpscale && !needsLoop) {
+      console.log(`[videoProcessor] Video satisfies dimensions (>=720px) and duration (${duration}s). Passing full original buffer untrimmed.`);
       return { buffer: inputBuffer, width, height, processed: false };
     }
 
@@ -79,14 +80,14 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
       if (targetH < 720) targetH = 720;
       targetW = Math.ceil(targetW / 2) * 2;
       targetH = Math.ceil(targetH / 2) * 2;
-      console.log(`[videoProcessor] Upscaling video from ${width}x${height} to ${targetW}x${targetH} (HD quality)`);
+      console.log(`[videoProcessor] Upscaling video from ${width}x${height} to ${targetW}x${targetH} (HD quality, full ${duration}s untrimmed)`);
     }
 
     // Build FFmpeg command with high quality bicubic scaling and optional audio stream mapping
     const filter = `scale=${targetW}:${targetH}:flags=bicubic`;
-    const loopCount = needsLoop ? Math.max(1, Math.ceil(3.5 / Math.max(0.5, duration)) - 1) : 0;
+    const loopCount = needsLoop ? Math.max(1, Math.ceil(2.5 / Math.max(0.5, duration)) - 1) : 0;
     const loopArg = loopCount > 0 ? `-stream_loop ${loopCount} ` : '';
-    const durationLimit = needsTrim ? '-t 9.8' : (needsLoop ? '-t 4' : '');
+    const durationLimit = needsLoop ? '-t 3' : '';
     const ffmpegCmd = `ffmpeg -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
 
     console.log(`[videoProcessor] Running FFmpeg optimization: ${ffmpegCmd}`);
@@ -134,8 +135,9 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase) {
     // Download video
     const response = await axios.get(videoUrl, {
       responseType: 'arraybuffer',
-      timeout: 30000,
-      maxContentLength: 100 * 1024 * 1024
+      timeout: 60000,
+      maxContentLength: 250 * 1024 * 1024,
+      maxBodyLength: 250 * 1024 * 1024
     });
 
     const inputBuffer = Buffer.from(response.data);
