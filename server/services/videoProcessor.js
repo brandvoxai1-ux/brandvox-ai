@@ -14,7 +14,7 @@ const execPromise = promisify(exec);
  */
 async function probeVideo(filePath) {
   try {
-    const cmd = `ffprobe -v error -select_streams v:0 -show_entries stream=width,height,duration -of json "${filePath}"`;
+    const cmd = `ffprobe -v error -select_streams v:0 -show_entries stream=width,height,duration,sample_aspect_ratio -of json "${filePath}"`;
     const { stdout } = await execPromise(cmd);
     const data = JSON.parse(stdout);
     const stream = data?.streams?.[0];
@@ -24,7 +24,8 @@ async function probeVideo(filePath) {
     return {
       width: parseInt(stream.width, 10),
       height: parseInt(stream.height, 10),
-      duration: parseFloat(stream.duration || 0)
+      duration: parseFloat(stream.duration || 0),
+      sar: stream.sample_aspect_ratio || '1:1'
     };
   } catch (error) {
     console.warn('[videoProcessor] ffprobe failed:', error.message);
@@ -36,6 +37,7 @@ async function probeVideo(filePath) {
  * Ensures video meets AI provider specifications:
  * - Both sides (width and height) must be at least 720px (Kling 3.0 requirement: 720px-2160px per side).
  * - Maximum duration of 10s (Kling 3.0 Omni requirement: 3-10s).
+ * - Strict 1:1 square pixel aspect ratio (PAR / SAR) required by Kling VideoNormalize.
  * @param {Buffer} inputBuffer
  * @param {string} mimeType
  * @param {Object} [options]
@@ -57,15 +59,17 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
       return { buffer: inputBuffer, processed: false };
     }
 
-    const { width, height, duration } = info;
-    console.log(`[videoProcessor] Reference video probed: ${width}x${height}, duration: ${duration}s (maxDuration: ${maxDuration || 'unlimited'})`);
+    const { width, height, duration, sar } = info;
+    const isNonSquareSar = sar && sar !== '1:1' && sar !== '0:1' && sar !== 'N/A';
+    console.log(`[videoProcessor] Reference video probed: ${width}x${height}, duration: ${duration}s, sar: ${sar || '1:1'} (maxDuration: ${maxDuration || 'unlimited'})`);
 
     const needsUpscale = width < 720 || height < 720;
     const needsLoop = duration < 2.0;
     const needsDurationCap = maxDuration && duration > maxDuration;
+    const needsSarFix = isNonSquareSar;
 
-    if (!needsUpscale && !needsLoop && !needsDurationCap) {
-      console.log(`[videoProcessor] Video satisfies dimensions (>=720px) and duration (${duration}s). Passing full original buffer.`);
+    if (!needsUpscale && !needsLoop && !needsDurationCap && !needsSarFix) {
+      console.log(`[videoProcessor] Video satisfies dimensions (>=720px), duration (${duration}s), and square pixels (1:1). Passing full original buffer.`);
       return { buffer: inputBuffer, width, height, processed: false };
     }
 
@@ -83,10 +87,14 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
       targetW = Math.ceil(targetW / 2) * 2;
       targetH = Math.ceil(targetH / 2) * 2;
       console.log(`[videoProcessor] Upscaling video from ${width}x${height} to ${targetW}x${targetH} (HD quality)`);
+    } else {
+      // Ensure dimensions are even numbers for H.264
+      targetW = Math.round(targetW / 2) * 2;
+      targetH = Math.round(targetH / 2) * 2;
     }
 
-    // Build FFmpeg command with high quality bicubic scaling and optional audio stream mapping
-    const filter = `scale=${targetW}:${targetH}:flags=bicubic`;
+    // Build FFmpeg command with high quality bicubic scaling, square pixel PAR (1:1), and audio stream mapping
+    const filter = `scale=${targetW}:${targetH}:flags=bicubic,setsar=1`;
     const loopCount = needsLoop ? Math.max(1, Math.ceil(2.5 / Math.max(0.5, duration)) - 1) : 0;
     const loopArg = loopCount > 0 ? `-stream_loop ${loopCount} ` : '';
     const durationLimit = needsLoop ? '-t 3' : (needsDurationCap ? `-t ${maxDuration}` : '');
