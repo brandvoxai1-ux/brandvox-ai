@@ -60,7 +60,7 @@ export default function Landing() {
     {
       icon: Zap,
       title: 'Multi-Model SOTA Engine',
-      desc: 'Seamlessly toggle between WAN 2.2, Kling 3.0 Omni, and Seedance 2.0 to find the ideal motion dynamics for every creative prompt.'
+      desc: 'Seamlessly toggle between WAN 2.2, Kling 3.0 Omni, and Seedance 2.5 to find the ideal motion dynamics for every creative prompt.'
     },
     {
       icon: Film,
@@ -149,7 +149,7 @@ export default function Landing() {
         </h1>
 
         <p className="text-sm md:text-base text-white/60 font-medium max-w-2xl leading-relaxed mb-10">
-          BrandVox AI gives you access to the world's best video generation models — WAN 2.2 and Seedance 2.0 — in one beautiful platform, billed instantly in INR.
+          BrandVox AI gives you access to the world's best video generation models — WAN 2.2, Kling 3.0 Omni, and ByteDance Seedance 2.5 — in one beautiful platform, billed instantly in INR.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center space-y-3.5 sm:space-y-0 sm:space-x-4 mb-14">

@@ -278,7 +278,8 @@ export default function Studio() {
         }
         if (models.length > 0) {
           const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
-          const found = videoModels.find(m => m.id === modelVal && ['kling-3-omni', 'seedance-2'].includes(m.id)) ||
+          const found = videoModels.find(m => m.id === modelVal && ['kling-3-omni', 'seedance-2.5', 'seedance-2'].includes(m.id)) ||
+                        videoModels.find(m => m.id === 'seedance-2.5') ||
                         videoModels.find(m => m.id === 'kling-3-omni') || 
                         videoModels.find(m => m.id === 'seedance-2') || 
                         videoModels[0];
@@ -480,8 +481,8 @@ export default function Studio() {
         }
       } else if (activeMode === 'swap') {
         const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
-        const swapModel = videoModels.find(m => m.id === 'kling-3-omni') || videoModels.find(m => m.id === 'seedance-2') || videoModels[0];
-        if (!selectedModel || !['kling-3-omni', 'seedance-2'].includes(selectedModel.id)) {
+        const swapModel = videoModels.find(m => m.id === 'seedance-2.5') || videoModels.find(m => m.id === 'kling-3-omni') || videoModels.find(m => m.id === 'seedance-2') || videoModels[0];
+        if (!selectedModel || !['kling-3-omni', 'seedance-2.5', 'seedance-2'].includes(selectedModel.id)) {
           setSelectedModel(swapModel);
         }
       } else {
@@ -1102,7 +1103,7 @@ export default function Studio() {
                   {models
                     .filter(m => {
                       if (activeMode === 'image') return m.model_type === 'image';
-                      if (activeMode === 'swap') return m.id === 'kling-3-omni' || m.id === 'seedance-2';
+                      if (activeMode === 'swap') return m.id === 'kling-3-omni' || m.id === 'seedance-2.5' || m.id === 'seedance-2';
                       return (m.model_type || 'video') !== 'image';
                     })
                     .filter(m => !modelSearch || m.name.toLowerCase().includes(modelSearch.toLowerCase()))
@@ -1193,7 +1194,7 @@ export default function Studio() {
                   <span className="text-primary-hover font-black">{duration}s</span>
                 </div>
                 <div className="grid grid-cols-6 gap-1 bg-white/5 p-1 rounded-xl border border-white/8">
-                  {[4, 6, 8, 10, 12, 15].map((sec) => {
+                  {((Number(selectedModel?.max_duration) || 15) >= 30 ? [5, 10, 15, 20, 25, 30] : [4, 6, 8, 10, 12, 15]).map((sec) => {
                     const maxAllowed = Math.max(15, Number(selectedModel?.max_duration) || 15);
                     const isDisabled = sec > maxAllowed;
                     return (

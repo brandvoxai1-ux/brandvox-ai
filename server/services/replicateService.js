@@ -53,7 +53,10 @@ const REPLICATE_MODEL_MAP = {
   'bytedance/seedance-2.0/fast/text-to-video': 'bytedance/seedance-2.0',
   'bytedance/seedance-2.0/text-to-video': 'bytedance/seedance-2.0',
   'bytedance/seedance-2.0/image-to-video': 'bytedance/seedance-2.0',
-  'bytedance/seedance-2.0': 'bytedance/seedance-2.0'
+  'bytedance/seedance-2.0': 'bytedance/seedance-2.0',
+  'seedance-2-5': 'bytedance/seedance-2.5',
+  'seedance-2.5': 'bytedance/seedance-2.5',
+  'bytedance/seedance-2.5': 'bytedance/seedance-2.5'
 };
 
 /**
@@ -219,7 +222,7 @@ async function generateCharacterSwapVideo({
   
   // Guarantee character swap uses a true V2V motion transfer model
   const model = resolved.includes('seedance')
-    ? 'bytedance/seedance-2.0'
+    ? (resolved.includes('2.5') ? 'bytedance/seedance-2.5' : 'bytedance/seedance-2.0')
     : 'kwaivgi/kling-v3-omni-video';
 
   const input = {};
@@ -369,11 +372,14 @@ async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ra
     if (duration) {
       const parsedDur = parseInt(duration, 10);
       if (!isNaN(parsedDur)) {
-        input.duration = Math.max(3, Math.min(15, parsedDur));
+        input.duration = Math.max(3, Math.min(30, parsedDur));
       }
     }
     input.generate_audio = generate_audio !== false;
-    if (cleanImageUrl) input.image = cleanImageUrl;
+    if (cleanImageUrl) {
+      input.image = cleanImageUrl;
+      input.reference_images = [cleanImageUrl];
+    }
   } else if (model.includes('minimax')) {
     input.prompt_optimizer = true;
     if (cleanImageUrl) input.first_frame_image = cleanImageUrl;
