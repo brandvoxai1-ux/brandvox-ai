@@ -103,6 +103,12 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
           >
             <X className="w-3.5 h-3.5" />
           </button>
+          {uploading && (
+            <div className="absolute top-2 left-2 bg-black/85 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-bold text-primary flex items-center gap-1 border border-primary/20 shadow-md">
+              <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />
+              <span>Syncing...</span>
+            </div>
+          )}
           <div className="absolute bottom-2 left-2 bg-black/80 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-bold text-white/90 uppercase tracking-wider flex items-center gap-1.5">
             <VideoIcon className="w-3 h-3 text-primary" />
             <span className="truncate max-w-[150px]">{fileName || 'Source Motion Video'}</span>

@@ -1,4 +1,5 @@
 // server/routes/upload.js
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -93,37 +94,17 @@ router.post('/video', authMiddleware, videoUpload.single('file'), async (req, re
   }
 
   try {
-    const { processReferenceVideoBuffer } = require('../services/videoProcessor');
-    let bufferToUpload = req.file.buffer;
-    let mimeType = req.file.mimetype;
-    let isEnhanced = false;
-    let finalWidth = null;
-    let finalHeight = null;
-
-    try {
-      console.log(`[UploadService] Checking and auto-conforming video: ${req.file.originalname} (${req.file.size} bytes)`);
-      const proc = await processReferenceVideoBuffer(req.file.buffer, req.file.mimetype);
-      if (proc.processed && proc.buffer) {
-        bufferToUpload = proc.buffer;
-        mimeType = 'video/mp4';
-        isEnhanced = true;
-        finalWidth = proc.width;
-        finalHeight = proc.height;
-        console.log(`[UploadService] Video auto-enhanced to ${finalWidth}x${finalHeight} HD (${bufferToUpload.length} bytes)`);
-      }
-    } catch (procErr) {
-      console.warn('[UploadService] Video auto-enhance warning:', procErr.message);
-    }
-
-    const ext = isEnhanced ? 'mp4' : (req.file.mimetype === 'video/quicktime' ? 'mov' : (req.file.mimetype.split('/')[1] || 'mp4'));
+    const origExt = (path.extname(req.file.originalname || '') || '').toLowerCase().replace('.', '');
+    const mimeExt = req.file.mimetype === 'video/quicktime' ? 'mov' : (req.file.mimetype?.split('/')[1] || 'mp4');
+    const ext = origExt || mimeExt || 'mp4';
     const filename = `${req.user.id}/source_${Date.now()}.${ext}`;
 
-    console.log(`[UploadService] Uploading video to storage: ${filename} (${bufferToUpload.length} bytes)`);
+    console.log(`[UploadService] Direct fast-upload to storage: ${filename} (${req.file.size} bytes)`);
 
     const { data, error } = await supabase.storage
       .from('uploads')
-      .upload(filename, bufferToUpload, {
-        contentType: mimeType,
+      .upload(filename, req.file.buffer, {
+        contentType: req.file.mimetype || 'video/mp4',
         upsert: true
       });
 
@@ -140,10 +121,7 @@ router.post('/video', authMiddleware, videoUpload.single('file'), async (req, re
     res.json({
       success: true,
       url: publicUrl,
-      filename,
-      enhanced: isEnhanced,
-      width: finalWidth,
-      height: finalHeight
+      filename
     });
   } catch (err) {
     console.error('[UploadService] Video upload failed:', err.message);
