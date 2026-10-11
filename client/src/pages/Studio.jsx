@@ -1281,14 +1281,15 @@ export default function Studio() {
   return (
     <div className="flex flex-grow h-full max-h-[calc(100dvh-4rem)] md:max-h-screen overflow-hidden bg-darkBg text-white relative">
       
-      {/* MOBILE CONTROL DRAWER (Slide-up sheet for < lg screens) */}
+      {/* MOBILE CONTROL DRAWER (Slide-up native bottom sheet for < lg screens) */}
       {mobileControlsOpen && (
         <>
           <div
             className="lg:hidden fixed inset-0 z-45 bg-black/80 backdrop-blur-xs transition-opacity animate-fade-in"
             onClick={() => setMobileControlsOpen(false)}
           />
-          <div className="lg:hidden fixed bottom-16 left-0 right-0 max-h-[82dvh] bg-[#141416] border-t border-white/10 rounded-t-3xl p-5 overflow-y-auto z-50 shadow-2xl flex flex-col space-y-4 animate-fade-in">
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 max-h-[88dvh] bg-[#141416] border-t border-white/10 rounded-t-3xl p-5 pb-24 overflow-y-auto z-50 shadow-2xl flex flex-col space-y-4 animate-fade-in">
+            <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-1 shrink-0" />
             <div className="flex items-center justify-between pb-3 border-b border-white/5 sticky top-0 bg-[#141416] z-10">
               <div className="flex items-center space-x-2">
                 <SlidersHorizontal className="w-4 h-4 text-primary" />
@@ -1296,10 +1297,10 @@ export default function Studio() {
               </div>
               <button
                 onClick={() => setMobileControlsOpen(false)}
-                className="text-white/40 hover:text-white p-1 rounded-md transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                 title="Close"
               >
-                <X className="w-4.5 h-4.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
             {renderControlPanelContent(true)}
@@ -1368,26 +1369,35 @@ export default function Studio() {
         {/* Middle Canvas workspace area */}
         <div className="flex-grow overflow-y-auto p-3 sm:p-6 flex flex-col justify-between space-y-3 sm:space-y-6">
           
-          {/* Mobile Studio Quick Status & Config Trigger Bar */}
-          <div className="lg:hidden flex items-center justify-between bg-surface-elevated/90 backdrop-blur-md px-3 py-2 rounded-xl border border-white/8 text-xs select-none shadow-sm">
-            <div className="flex items-center space-x-1.5 overflow-hidden">
-              <span className="px-2 py-0.5 rounded-md bg-primary/20 text-primary-hover font-black text-[9.5px] uppercase shrink-0">
-                {activeMode === 'swap' ? 'Ingredients' : activeMode === 'image' ? 'Image' : 'Video'}
-              </span>
-              <span className="font-bold text-white/90 text-xs truncate max-w-[130px]">
-                {selectedModel?.name || 'Model'}
-              </span>
-              <span className="text-[10px] text-white/40 font-mono shrink-0">
-                {aspectRatio}
-              </span>
+          {/* Mobile Quick Mode Selector & Settings Ribbon */}
+          <div className="lg:hidden flex items-center justify-between gap-1.5 bg-surface-elevated/90 backdrop-blur-md p-1.5 rounded-xl border border-white/8 text-xs select-none shadow-sm">
+            <div className="flex bg-black/40 p-0.5 rounded-lg border border-white/5 text-[10px] font-bold uppercase tracking-wider flex-1">
+              {[
+                { id: 'video', label: 'Cinema', icon: Film },
+                { id: 'swap', label: 'Recast', icon: Users },
+                { id: 'image', label: 'Image', icon: Sparkles }
+              ].map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveMode(id)}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md transition-all cursor-pointer ${
+                    activeMode === id ? 'bg-primary text-white shadow-xs' : 'text-white/40 hover:text-white/70'
+                  }`}
+                >
+                  <Icon className="w-3 h-3" />
+                  <span>{label}</span>
+                </button>
+              ))}
             </div>
+
             <button
               type="button"
               onClick={() => setMobileControlsOpen(true)}
-              className="flex items-center space-x-1 px-2.5 py-1 bg-white/10 hover:bg-white/15 text-white rounded-lg text-[10.5px] font-bold transition-all border border-white/10 shrink-0 cursor-pointer active:scale-95"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/80 rounded-lg text-[10.5px] font-bold transition-all border border-white/8 shrink-0 cursor-pointer"
+              title="Open studio settings"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-primary-hover" />
-              <span>Model & Settings</span>
+              <span className="text-[10px]">{aspectRatio}</span>
             </button>
           </div>
 
@@ -1685,14 +1695,14 @@ export default function Studio() {
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-white/5 text-[9.5px]">
                 <span className="font-black uppercase text-primary tracking-wider shrink-0 flex items-center gap-1 mr-0.5">
                   <Camera className="w-3 h-3 text-primary" />
-                  Camera Motion:
+                  Camera:
                 </span>
                 {cameraPresets.map((cam) => (
                   <button
                     key={cam.id}
                     type="button"
                     onClick={() => handleToggleCamera(cam)}
-                    className={`px-2 py-0.5 rounded-md font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                    className={`px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 text-[10.5px] sm:text-xs min-h-[30px] sm:min-h-[32px] ${
                       selectedCamera === cam.id
                         ? 'bg-primary text-white border-primary shadow-xs'
                         : 'bg-white/5 text-white/60 hover:text-white border-white/10 hover:bg-white/10'
@@ -1704,9 +1714,6 @@ export default function Studio() {
                 ))}
               </div>
             )}
-
-            {/* Google Flow Ingredients Quick-Tag Chips (Ingredients Mode) */}
-
 
             {/* Prompt Textarea */}
             <div className="relative">
@@ -1723,7 +1730,7 @@ export default function Studio() {
                 onChange={(e) => setPromptText(e.target.value)}
                 maxLength="1500"
                 rows="2"
-                className="w-full bg-surface-elevated text-xs rounded-xl px-3.5 py-2.5 sm:py-3 border border-white/10 focus:outline-none focus:border-primary text-white resize-none placeholder-white/20"
+                className="w-full bg-surface-elevated text-xs sm:text-sm rounded-xl px-3.5 py-2.5 sm:py-3 border border-white/10 focus:outline-none focus:border-primary text-white resize-none placeholder-white/20"
               />
               <span className="absolute bottom-2.5 right-3 text-[10px] font-bold text-white/25">
                 {promptText.length}/1500
@@ -1733,9 +1740,122 @@ export default function Studio() {
             <div className="flex items-center justify-between text-[10px] text-white/40 font-semibold tracking-wider">
               <span className="truncate mr-2 flex items-center gap-1.5 text-emerald-400/90 font-bold uppercase text-[9.5px]">
                 <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
-                <span>Universal Prompt Shield Active · Unrestricted Generation</span>
+                <span>Universal Prompt Shield Active</span>
               </span>
               <span className="hidden sm:inline shrink-0 uppercase text-[9.5px] text-white/30">Ctrl+Enter to compile</span>
+            </div>
+
+            {/* MOBILE DOCKED THUMB ACTION BAR (< lg screens only) */}
+            <div className="lg:hidden pt-2.5 border-t border-white/8 flex flex-col gap-2">
+              {/* Quick thumb controls row: Aspect Ratio + Media Status + Settings */}
+              <div className="flex items-center justify-between gap-1.5 text-xs">
+                {/* 1-Tap Aspect Ratio toggle: 9:16 vertical <-> 16:9 landscape */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextAspect = aspectRatio === '9:16' ? '16:9' : '9:16';
+                    setAspectRatio(nextAspect);
+                    toast.success(`Switched to ${nextAspect === '9:16' ? 'Vertical Reel (9:16)' : 'Landscape (16:9)'}`, { icon: '📐', duration: 1500 });
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 rounded-xl text-white font-bold text-xs shrink-0 transition-all cursor-pointer min-h-[38px]"
+                  title="Toggle Aspect Ratio (9:16 Reel vs 16:9 Cinema)"
+                >
+                  <span className="text-primary font-black">{aspectRatio}</span>
+                  <span className="text-white/60 text-[10px]">{aspectRatio === '9:16' ? 'Reel' : 'Cinema'}</span>
+                </button>
+
+                {/* Quick Media Trigger pill */}
+                <button
+                  type="button"
+                  onClick={() => setMobileControlsOpen(true)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-xs font-bold transition-all cursor-pointer flex-1 truncate justify-center min-h-[38px] ${
+                    activeMode === 'swap'
+                      ? (sourceVideoUrl
+                          ? 'bg-primary/15 text-primary-hover border-primary/30'
+                          : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10')
+                      : (imageUrl
+                          ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                          : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10')
+                  }`}
+                >
+                  {activeMode === 'swap' ? (
+                    <>
+                      <Film className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">
+                        {sourceVideoUrl ? '✓ Video Ready' : '+ Upload Video'}
+                      </span>
+                    </>
+                  ) : activeMode === 'image' ? (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{selectedModel?.name || 'Image Engine'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Film className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{imageUrl ? '✓ Image Attached' : '+ Add Image Ref'}</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Full studio settings trigger button */}
+                <button
+                  type="button"
+                  onClick={() => setMobileControlsOpen(true)}
+                  className="flex items-center justify-center w-10 h-[38px] bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 rounded-xl text-white/70 hover:text-white transition-all cursor-pointer shrink-0"
+                  title="Studio Model & Settings"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-primary" />
+                </button>
+              </div>
+
+              {/* Primary Mobile Action Buttons Row (Direct Thumb Reach!) */}
+              <div className="flex items-center gap-2">
+                {(generationStatus === 'pending' || generationStatus === 'processing') && (
+                  <button
+                    type="button"
+                    disabled={cancelling}
+                    onClick={() => handleCancelGeneration()}
+                    className="flex items-center justify-center gap-1 px-3.5 py-3 bg-red-500/15 hover:bg-red-500/25 active:bg-red-500/35 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 min-h-[44px]"
+                    title="Cancel and refund"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    <span>Cancel</span>
+                  </button>
+                )}
+
+                <Button
+                  variant="primary"
+                  size="lg"
+                  disabled={
+                    (activeMode === 'swap'
+                      ? (!sourceVideoUrl || (!imageUrl && !swapCharacters.some(c => Boolean(c.target_image_url?.trim())) && !promptText.trim()))
+                      : !promptText.trim()
+                    ) ||
+                    insufficientCredits ||
+                    generationStatus === 'pending' ||
+                    generationStatus === 'processing' ||
+                    imageGenerating
+                  }
+                  onClick={handleGenerate}
+                  className="flex-1 py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-glow cursor-pointer active:scale-98 transition-all min-h-[44px]"
+                >
+                  {generationStatus === 'pending' || generationStatus === 'processing' || imageGenerating ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-yellow-300" />
+                      <span>{activeMode === 'swap' ? 'Recast Video' : activeMode === 'image' ? 'Generate Image' : 'Compose Video'}</span>
+                      <span className="bg-black/35 px-2 py-0.5 rounded text-[10.5px] font-extrabold text-white/90">
+                        {formatCredits(cost)}
+                      </span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

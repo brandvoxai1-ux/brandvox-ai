@@ -133,9 +133,9 @@ export default function Topbar({
           <NotificationBell onOpenDrawer={onOpenNotifications} />
         </div>
 
-        {/* Global Action / Generate Button */}
+        {/* Global Action / Generate Button (Desktop header — on mobile this is docked in the Thumb Zone) */}
         {actionButton && (
-          <div className="shrink-0 scale-90 sm:scale-100 origin-right">
+          <div className="shrink-0 scale-90 sm:scale-100 origin-right hidden lg:block">
             {actionButton}
           </div>
         )}
