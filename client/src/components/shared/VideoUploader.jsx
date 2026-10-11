@@ -22,9 +22,9 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
   const handleFile = useCallback(async (file) => {
     if (!file) return;
 
-    const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Only MP4, WebM, or MOV video files are allowed.');
+    const isVideo = file.type?.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi|3gp|flv|m4v|wmv)$/i.test(file.name);
+    if (!isVideo) {
+      toast.error('Please upload a valid video file.');
       return;
     }
 
@@ -36,25 +36,6 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
     setFileName(file.name);
     const localPreview = URL.createObjectURL(file);
     setPreview(localPreview);
-
-    // Non-blocking client-side duration probe
-    try {
-      const probeEl = document.createElement('video');
-      probeEl.preload = 'metadata';
-      probeEl.src = localPreview;
-      probeEl.onloadedmetadata = () => {
-        const w = probeEl.videoWidth;
-        const h = probeEl.videoHeight;
-        if (w > 0 && h > 0 && (w < 720 || h < 720)) {
-          toast(`Notice: Video (${w}×${h}) will be auto-conformed to 720p+ HD for AI compatibility.`, {
-            icon: '⚡',
-            duration: 4000
-          });
-        }
-      };
-    } catch {
-      // Non-critical probe failure
-    }
 
     setUploading(true);
 
@@ -70,11 +51,7 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
       const permanentUrl = res.data.url;
       setPreview(permanentUrl);
       onUrlReady(permanentUrl);
-      if (res.data?.enhanced) {
-        toast.success(`Video auto-enhanced to ${res.data.width}×${res.data.height} HD for Kling compatibility!`, { icon: '⚡' });
-      } else {
-        toast.success('Source video uploaded successfully!');
-      }
+      toast.success('Source video ready!');
     } catch (err) {
       setPreview(null);
       setFileName('');
@@ -156,7 +133,7 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
         <input
           ref={fileInputRef}
           type="file"
-          accept="video/mp4,video/webm,video/quicktime"
+          accept="video/*"
           onChange={handleInputChange}
           className="hidden"
         />
@@ -177,7 +154,7 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
                 Choose Source Video File
               </p>
               <p className="text-[9px] text-white/40 mt-0.5">
-                Drag & drop or click to browse (MP4, WebM, MOV · max 200MB · up to 30s+)
+                Drag & drop or click to browse any video (max 200MB)
               </p>
             </div>
           </div>

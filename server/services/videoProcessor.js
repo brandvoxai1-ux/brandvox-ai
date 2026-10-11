@@ -38,9 +38,12 @@ async function probeVideo(filePath) {
  * - Maximum duration of 10s (Kling 3.0 Omni requirement: 3-10s).
  * @param {Buffer} inputBuffer
  * @param {string} mimeType
+ * @param {Object} [options]
+ * @param {number|null} [options.maxDuration]
  * @returns {Promise<{ buffer: Buffer, width?: number, height?: number, processed: boolean }>}
  */
-async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') {
+async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', options = {}) {
+  const { maxDuration = null } = options;
   const tempId = `vproc_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const inputPath = path.join(os.tmpdir(), `${tempId}_in.mp4`);
   const outputPath = path.join(os.tmpdir(), `${tempId}_out.mp4`);
@@ -55,15 +58,14 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
     }
 
     const { width, height, duration } = info;
-    console.log(`[videoProcessor] Reference video probed: ${width}x${height}, duration: ${duration}s (zero-trimming preservation active)`);
+    console.log(`[videoProcessor] Reference video probed: ${width}x${height}, duration: ${duration}s (maxDuration: ${maxDuration || 'unlimited'})`);
 
     const needsUpscale = width < 720 || height < 720;
-    // We strictly DO NOT trim videos. Source videos up to 30s+ remain untrimmed.
-    // Only loop if video is excessively short (< 2.0s) so models don't fail on tiny sub-second clips.
     const needsLoop = duration < 2.0;
+    const needsDurationCap = maxDuration && duration > maxDuration;
 
-    if (!needsUpscale && !needsLoop) {
-      console.log(`[videoProcessor] Video satisfies dimensions (>=720px) and duration (${duration}s). Passing full original buffer untrimmed.`);
+    if (!needsUpscale && !needsLoop && !needsDurationCap) {
+      console.log(`[videoProcessor] Video satisfies dimensions (>=720px) and duration (${duration}s). Passing full original buffer.`);
       return { buffer: inputBuffer, width, height, processed: false };
     }
 
@@ -80,14 +82,14 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
       if (targetH < 720) targetH = 720;
       targetW = Math.ceil(targetW / 2) * 2;
       targetH = Math.ceil(targetH / 2) * 2;
-      console.log(`[videoProcessor] Upscaling video from ${width}x${height} to ${targetW}x${targetH} (HD quality, full ${duration}s untrimmed)`);
+      console.log(`[videoProcessor] Upscaling video from ${width}x${height} to ${targetW}x${targetH} (HD quality)`);
     }
 
     // Build FFmpeg command with high quality bicubic scaling and optional audio stream mapping
     const filter = `scale=${targetW}:${targetH}:flags=bicubic`;
     const loopCount = needsLoop ? Math.max(1, Math.ceil(2.5 / Math.max(0.5, duration)) - 1) : 0;
     const loopArg = loopCount > 0 ? `-stream_loop ${loopCount} ` : '';
-    const durationLimit = needsLoop ? '-t 3' : '';
+    const durationLimit = needsLoop ? '-t 3' : (needsDurationCap ? `-t ${maxDuration}` : '');
     const ffmpegCmd = `ffmpeg -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
 
     console.log(`[videoProcessor] Running FFmpeg optimization: ${ffmpegCmd}`);
@@ -120,17 +122,22 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
 
 /**
  * Inspects a remote reference video URL and ensures it meets the 720px requirement.
- * If undersized, downloads, upscales, and re-uploads to Supabase Storage.
+ * If undersized or requiring model duration conforming, downloads, processes, and re-uploads to Supabase Storage.
  * @param {string} videoUrl
  * @param {string} userId
  * @param {object} supabase
+ * @param {string} [targetModelId]
  * @returns {Promise<string>} Clean, Replicate-compatible video URL
  */
-async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase) {
+async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, targetModelId = null) {
   if (!videoUrl || typeof videoUrl !== 'string') return videoUrl;
 
   try {
-    console.log(`[videoProcessor] Checking compatibility for reference video: ${videoUrl}`);
+    const isKling = targetModelId && String(targetModelId).toLowerCase().includes('kling');
+    // Kling requires reference videos between 3s and 10s. For Kling, cap at 9.9s so upstream E006 is avoided.
+    const maxDuration = isKling ? 9.9 : null;
+
+    console.log(`[videoProcessor] Checking compatibility for reference video: ${videoUrl} (model: ${targetModelId || 'generic'}, maxDuration: ${maxDuration || 'unlimited'})`);
     
     // Download video
     const response = await axios.get(videoUrl, {
@@ -141,15 +148,15 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase) {
     });
 
     const inputBuffer = Buffer.from(response.data);
-    const result = await processReferenceVideoBuffer(inputBuffer);
+    const result = await processReferenceVideoBuffer(inputBuffer, 'video/mp4', { maxDuration });
 
     if (!result.processed) {
       // Already valid or processing unavailable
       return videoUrl;
     }
 
-    // Upload upscaled video to Supabase Storage
-    const filename = `${userId || 'system'}/upscaled_hd_${Date.now()}.mp4`;
+    // Upload processed video to Supabase Storage
+    const filename = `${userId || 'system'}/conformed_hd_${Date.now()}.mp4`;
     const { error } = await supabase.storage
       .from('uploads')
       .upload(filename, result.buffer, {
@@ -158,7 +165,7 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase) {
       });
 
     if (error) {
-      console.warn('[videoProcessor] Failed to upload upscaled reference video:', error.message);
+      console.warn('[videoProcessor] Failed to upload conformed reference video:', error.message);
       return videoUrl;
     }
 
@@ -166,7 +173,7 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase) {
       .from('uploads')
       .getPublicUrl(filename);
 
-    console.log(`[videoProcessor] Upscaled reference video ready for Replicate: ${publicUrl} (${result.width}x${result.height})`);
+    console.log(`[videoProcessor] Conformed reference video ready for AI model: ${publicUrl} (${result.width}x${result.height})`);
     return publicUrl;
   } catch (err) {
     console.warn('[videoProcessor] Error verifying remote video URL:', err.message);

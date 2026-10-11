@@ -604,7 +604,7 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
         let readyVideoUrl = source_video_url;
         try {
           const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
-          readyVideoUrl = await ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase);
+          readyVideoUrl = await ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase, model.id || model.fal_endpoint);
           console.log(`[CharacterSwap] Using verified reference video URL: ${readyVideoUrl}`);
         } catch (vProcErr) {
           console.warn('[CharacterSwap] Video processor warning, using source URL:', vProcErr.message);
@@ -861,8 +861,8 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
         errorMsg.toLowerCase().includes('flagged')
       );
 
-      // Auto-fallback: if Kling or Seedance triggered E005, retry with MiniMax Hailuo Video-01
-      if (isSensitiveOrE005 && gen.model_id !== 'minimax-hailuo' && !gen.error_message?.includes('[fallback-attempted]')) {
+      // Auto-fallback: if Kling or Seedance triggered E005, retry with MiniMax Hailuo Video-01 (text-to-video only, never for character swap)
+      if (gen.generation_type !== 'swap' && isSensitiveOrE005 && gen.model_id !== 'minimax-hailuo' && !gen.error_message?.includes('[fallback-attempted]')) {
         console.log(`[WebhookLogic] Upstream E005 moderation detected for gen ${generationId}. Retrying with MiniMax Hailuo Video-01...`);
         try {
           await supabase.from('generations').update({

@@ -72,11 +72,12 @@ const videoUpload = multer({
     fileSize: 200 * 1024 * 1024 // 200 MB max for videos up to 30s+ in high quality
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
-    if (allowedTypes.includes(file.mimetype)) {
+    const isVideo = file.mimetype?.startsWith('video/') ||
+      /\.(mp4|webm|mov|mkv|avi|3gp|flv|m4v|wmv|ts)$/i.test(file.originalname);
+    if (isVideo) {
       cb(null, true);
     } else {
-      cb(new Error('Only MP4, WebM, and MOV video files are allowed.'));
+      cb(new Error('Please upload a valid video file.'));
     }
   }
 });

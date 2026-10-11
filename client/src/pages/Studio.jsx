@@ -481,7 +481,7 @@ export default function Studio() {
         }
       } else if (activeMode === 'swap') {
         const videoModels = models.filter(m => (m.model_type || 'video') !== 'image');
-        const swapModel = videoModels.find(m => m.id === 'seedance-2.5') || videoModels.find(m => m.id === 'kling-3-omni') || videoModels.find(m => m.id === 'seedance-2') || videoModels[0];
+        const swapModel = videoModels.find(m => m.id === 'kling-3-omni') || videoModels.find(m => m.id === 'seedance-2.5') || videoModels.find(m => m.id === 'seedance-2') || videoModels[0];
         if (!selectedModel || !['kling-3-omni', 'seedance-2.5', 'seedance-2'].includes(selectedModel.id)) {
           setSelectedModel(swapModel);
         }
