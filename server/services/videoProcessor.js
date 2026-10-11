@@ -75,15 +75,19 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4') 
       // Dimensions must be even numbers for H.264
       targetW = Math.round((width * scale) / 2) * 2;
       targetH = Math.round((height * scale) / 2) * 2;
+      if (targetW < 720) targetW = 720;
+      if (targetH < 720) targetH = 720;
+      targetW = Math.ceil(targetW / 2) * 2;
+      targetH = Math.ceil(targetH / 2) * 2;
       console.log(`[videoProcessor] Upscaling video from ${width}x${height} to ${targetW}x${targetH} (HD quality)`);
     }
 
-    // Build FFmpeg command with high quality bicubic scaling and audio preservation
+    // Build FFmpeg command with high quality bicubic scaling and optional audio stream mapping
     const filter = `scale=${targetW}:${targetH}:flags=bicubic`;
     const loopCount = needsLoop ? Math.max(1, Math.ceil(3.5 / Math.max(0.5, duration)) - 1) : 0;
     const loopArg = loopCount > 0 ? `-stream_loop ${loopCount} ` : '';
     const durationLimit = needsTrim ? '-t 9.8' : (needsLoop ? '-t 4' : '');
-    const ffmpegCmd = `ffmpeg -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 19 -c:a aac -b:a 192k "${outputPath}"`;
+    const ffmpegCmd = `ffmpeg -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
 
     console.log(`[videoProcessor] Running FFmpeg optimization: ${ffmpegCmd}`);
     await execPromise(ffmpegCmd);

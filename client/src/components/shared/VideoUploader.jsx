@@ -43,10 +43,18 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
       probeEl.preload = 'metadata';
       probeEl.src = localPreview;
       probeEl.onloadedmetadata = () => {
+        const w = probeEl.videoWidth;
+        const h = probeEl.videoHeight;
+        if (w > 0 && h > 0 && (w < 720 || h < 720)) {
+          toast(`Notice: Video (${w}×${h}) will be auto-conformed to 720p+ HD for AI compatibility.`, {
+            icon: '⚡',
+            duration: 4000
+          });
+        }
         if (probeEl.duration > 9.9) {
-          toast('Notice: Video is longer than 10s — will be automatically trimmed to 9.8s for Kling AI compatibility.', {
+          toast('Notice: Video is longer than 10s — will be automatically trimmed to 9.8s for AI compatibility.', {
             icon: '✂️',
-            duration: 5000
+            duration: 4000
           });
         }
       };

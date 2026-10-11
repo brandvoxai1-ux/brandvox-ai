@@ -92,16 +92,38 @@ router.post('/video', authMiddleware, videoUpload.single('file'), async (req, re
   }
 
   try {
-    const ext = req.file.mimetype === 'video/quicktime' ? 'mov' : (req.file.mimetype.split('/')[1] || 'mp4');
+    const { processReferenceVideoBuffer } = require('../services/videoProcessor');
+    let bufferToUpload = req.file.buffer;
+    let mimeType = req.file.mimetype;
+    let isEnhanced = false;
+    let finalWidth = null;
+    let finalHeight = null;
+
+    try {
+      console.log(`[UploadService] Checking and auto-conforming video: ${req.file.originalname} (${req.file.size} bytes)`);
+      const proc = await processReferenceVideoBuffer(req.file.buffer, req.file.mimetype);
+      if (proc.processed && proc.buffer) {
+        bufferToUpload = proc.buffer;
+        mimeType = 'video/mp4';
+        isEnhanced = true;
+        finalWidth = proc.width;
+        finalHeight = proc.height;
+        console.log(`[UploadService] Video auto-enhanced to ${finalWidth}x${finalHeight} HD (${bufferToUpload.length} bytes)`);
+      }
+    } catch (procErr) {
+      console.warn('[UploadService] Video auto-enhance warning:', procErr.message);
+    }
+
+    const ext = isEnhanced ? 'mp4' : (req.file.mimetype === 'video/quicktime' ? 'mov' : (req.file.mimetype.split('/')[1] || 'mp4'));
     const filename = `${req.user.id}/source_${Date.now()}.${ext}`;
 
-    console.log(`[UploadService] Fast-uploading source reference video: ${filename} (${req.file.size} bytes)`);
+    console.log(`[UploadService] Uploading video to storage: ${filename} (${bufferToUpload.length} bytes)`);
 
     const { data, error } = await supabase.storage
       .from('uploads')
-      .upload(filename, req.file.buffer, {
-        contentType: req.file.mimetype,
-        upsert: false
+      .upload(filename, bufferToUpload, {
+        contentType: mimeType,
+        upsert: true
       });
 
     if (error) {
@@ -112,12 +134,15 @@ router.post('/video', authMiddleware, videoUpload.single('file'), async (req, re
       .from('uploads')
       .getPublicUrl(filename);
 
-    console.log(`[UploadService] Video upload successful in memory. Public URL: ${publicUrl}`);
+    console.log(`[UploadService] Video upload complete. Public URL: ${publicUrl}`);
 
     res.json({
       success: true,
       url: publicUrl,
-      filename
+      filename,
+      enhanced: isEnhanced,
+      width: finalWidth,
+      height: finalHeight
     });
   } catch (err) {
     console.error('[UploadService] Video upload failed:', err.message);

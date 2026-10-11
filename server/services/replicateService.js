@@ -297,20 +297,20 @@ async function generateCharacterSwapVideo({
 
     if (hasTargetPhotos) {
       if (validPhotos.length === 1) {
-        const charLabel = validPhotos[0].label?.trim() ? `(${validPhotos[0].label})` : 'main character';
+        const charLabel = validPhotos[0].label?.trim() ? `(${validPhotos[0].label})` : 'main person';
         input.prompt = userPromptTranslated
-          ? `Replace ${charLabel} in <<<video_1>>> with <<<image_1>>>${propDirective}. ${userPromptTranslated}`
-          : `Replace ${charLabel} in <<<video_1>>> with <<<image_1>>>${propDirective}, photorealistic motion transfer`;
+          ? `Replace ${charLabel} in video with <<<image_1>>>${propDirective}. ${userPromptTranslated}`
+          : `Replace ${charLabel} in video with <<<image_1>>>${propDirective}, photorealistic motion transfer`;
       } else {
         const directives = validPhotos.map((c, i) => {
           const desc = c.label?.trim() ? `(${c.label})` : `character ${i + 1}`;
-          return `replace ${desc} with <<<image_${i + 1}>>>`;
+          return `replace ${desc} in video with <<<image_${i + 1}>>>`;
         }).join(', and ');
-        input.prompt = `Multi-character replacement in <<<video_1>>>: ${directives}${propDirective}. ${userPromptTranslated || 'photorealistic motion transfer'}`;
+        input.prompt = `Multi-character replacement in video: ${directives}${propDirective}. ${userPromptTranslated || 'photorealistic motion transfer'}`;
       }
       input.reference_images = allReferenceImages;
     } else {
-      input.prompt = userPromptTranslated || 'Transform character in <<<video_1>>>, photorealistic motion transfer';
+      input.prompt = userPromptTranslated || 'Transform character in video, photorealistic motion transfer';
       if (hasPropImage) {
         input.reference_images = allReferenceImages;
       }
@@ -328,28 +328,19 @@ async function generateCharacterSwapVideo({
     console.log(`[replicateService] Source Video: ${source_video}`);
     console.log(`[replicateService] Target Characters (${validPhotos.length}):`, validPhotos.map(p => p.label || p.target_image_url));
 
+    const predictionPayload = {
+      model,
+      input
+    };
+
     if (webhookUrl && !webhookUrl.includes('localhost') && !webhookUrl.includes('127.0.0.1')) {
-      const prediction = await replicate.predictions.create({
-        model,
-        input,
-        webhook: `${webhookUrl}?generationId=${generationId}`,
-        webhook_events_filter: ['completed']
-      });
-
-      console.log(`[replicateService] Created V2V prediction queue ID: ${prediction.id}`);
-      return { request_id: prediction.id };
-    } else {
-      console.log(`[replicateService] Running V2V prediction synchronously for: ${model}`);
-      const output = await replicate.run(model, { input });
-      const videoUrl = extractMediaUrl(output);
-
-      if (!videoUrl) {
-        throw new Error('Replicate did not return a valid video URL for character swap.');
-      }
-
-      console.log(`[replicateService] Character swap video generated successfully: ${videoUrl}`);
-      return { video_url: videoUrl };
+      predictionPayload.webhook = `${webhookUrl}?generationId=${generationId}`;
+      predictionPayload.webhook_events_filter = ['completed'];
     }
+
+    const prediction = await replicate.predictions.create(predictionPayload);
+    console.log(`[replicateService] Created V2V prediction queue ID: ${prediction.id}`);
+    return { request_id: prediction.id };
   } catch (error) {
     console.error('[replicateService] Character swap video generation failed:', error);
     throw new Error(error.message || 'Character replacement API request failed');

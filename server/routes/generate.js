@@ -600,8 +600,15 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
         const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
         const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
 
-        // Direct GPU cloud pass-through: pass CDN video URL straight to Replicate (< 400ms dispatch)
-        const readyVideoUrl = source_video_url;
+        // Auto-conform and ensure source video meets AI provider HD & duration specs
+        let readyVideoUrl = source_video_url;
+        try {
+          const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
+          readyVideoUrl = await ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase);
+          console.log(`[CharacterSwap] Using verified reference video URL: ${readyVideoUrl}`);
+        } catch (vProcErr) {
+          console.warn('[CharacterSwap] Video processor warning, using source URL:', vProcErr.message);
+        }
 
         const result = await replicateService.generateCharacterSwapVideo({
           endpoint: model.fal_endpoint,
