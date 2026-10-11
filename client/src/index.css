@@ -92,3 +92,23 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Suppress Netlify injected floating badge obstructing bottom mobile navigation */
+#netlify-badge,
+.netlify-badge,
+[data-netlify-badge],
+div[style*="position: fixed"][style*="bottom:"][style*="z-index: 1000000"],
+div[style*="position: fixed"][style*="bottom:"][style*="z-index: 2147483647"],
+iframe[src*="netlify"] {
+  display: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Optimize touch responsiveness and prevent unwanted double-tap zoom delay */
+@media (max-width: 768px) {
+  input, textarea, select, button {
+    touch-action: manipulation;
+  }
+}

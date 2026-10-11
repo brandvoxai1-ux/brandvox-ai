@@ -353,28 +353,28 @@ export default function Studio() {
       if (r < 0.75) {
         // Vertical Portrait (9:16 Shorts / Reels / TikTok)
         return {
-          wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
+          wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[26vh] xs:max-h-[30vh] sm:max-h-[42vh] lg:max-h-[58vh]',
           aspectRatio: '9/16',
           label: '9:16 Portrait'
         };
       } else if (r >= 0.75 && r <= 1.25) {
         // Square (1:1 Feed / Square)
         return {
-          wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
+          wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[26vh] xs:max-h-[30vh] sm:max-h-[42vh] lg:max-h-[58vh]',
           aspectRatio: '1/1',
           label: '1:1 Square'
         };
       } else if (r > 1.25 && r <= 1.55) {
         // Standard (4:3)
         return {
-          wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
+          wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[26vh] xs:max-h-[30vh] sm:max-h-[42vh] lg:max-h-[58vh]',
           aspectRatio: '4/3',
           label: '4:3 Standard'
         };
       } else {
         // Widescreen Landscape (16:9)
         return {
-          wrapperClass: 'w-full max-w-xl aspect-video max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
+          wrapperClass: 'w-full max-w-xl aspect-video max-h-[26vh] xs:max-h-[30vh] sm:max-h-[42vh] lg:max-h-[58vh]',
           aspectRatio: '16/9',
           label: '16:9 Landscape'
         };
@@ -385,19 +385,19 @@ export default function Studio() {
     const targetAspect = activeVideo?.aspect_ratio || aspectRatio;
     if (targetAspect === '9:16') {
       return {
-        wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
+        wrapperClass: 'w-auto max-w-[340px] aspect-[9/16] max-h-[26vh] xs:max-h-[30vh] sm:max-h-[42vh] lg:max-h-[58vh]',
         aspectRatio: '9/16',
         label: '9:16 Portrait'
       };
     } else if (targetAspect === '1:1') {
       return {
-        wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
+        wrapperClass: 'w-full max-w-[430px] aspect-square max-h-[26vh] xs:max-h-[30vh] sm:max-h-[42vh] lg:max-h-[58vh]',
         aspectRatio: '1/1',
         label: '1:1 Square'
       };
     } else if (targetAspect === '4:3') {
       return {
-        wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
+        wrapperClass: 'w-full max-w-lg aspect-[4/3] max-h-[26vh] xs:max-h-[30vh] sm:max-h-[42vh] lg:max-h-[58vh]',
         aspectRatio: '4/3',
         label: '4:3 Standard'
       };
@@ -405,8 +405,8 @@ export default function Studio() {
 
     // Default 16:9 Landscape
     return {
-      wrapperClass: 'w-full max-w-xl aspect-video max-h-[36vh] sm:max-h-[46vh] lg:max-h-[58vh]',
-      aspectRatio: '16:9',
+      wrapperClass: 'w-full max-w-xl aspect-video max-h-[26vh] xs:max-h-[30vh] sm:max-h-[42vh] lg:max-h-[58vh]',
+      aspectRatio: '16/9',
       label: '16:9 Landscape'
     };
   };
@@ -1279,7 +1279,7 @@ export default function Studio() {
   );
 
   return (
-    <div className="flex flex-grow h-full max-h-[calc(100dvh-4rem)] md:max-h-screen overflow-hidden bg-darkBg text-white relative">
+    <div className="flex flex-grow h-full w-full overflow-hidden bg-darkBg text-white relative">
       
       {/* MOBILE CONTROL DRAWER (Slide-up native bottom sheet for < lg screens) */}
       {mobileControlsOpen && (
@@ -1366,11 +1366,9 @@ export default function Studio() {
           }
         />
 
-        {/* Middle Canvas workspace area */}
-        <div className="flex-grow overflow-y-auto p-3 sm:p-6 flex flex-col justify-between space-y-3 sm:space-y-6">
-          
-          {/* Mobile Quick Mode Selector & Settings Ribbon */}
-          <div className="lg:hidden flex items-center justify-between gap-1.5 bg-surface-elevated/90 backdrop-blur-md p-1.5 rounded-xl border border-white/8 text-xs select-none shadow-sm">
+        {/* Mobile Quick Mode Selector & Settings Ribbon (< lg screens only) */}
+        <div className="lg:hidden px-2 pt-2 shrink-0">
+          <div className="flex items-center justify-between gap-1.5 bg-surface-elevated/90 backdrop-blur-md p-1.5 rounded-xl border border-white/8 text-xs select-none shadow-sm">
             <div className="flex bg-black/40 p-0.5 rounded-lg border border-white/5 text-[10px] font-bold uppercase tracking-wider flex-1">
               {[
                 { id: 'video', label: 'Cinema', icon: Film },
@@ -1397,12 +1395,15 @@ export default function Studio() {
               title="Open studio settings"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-primary-hover" />
-              <span className="text-[10px]">{aspectRatio}</span>
+              <span className="text-[10px] font-black">{aspectRatio}</span>
             </button>
           </div>
+        </div>
 
+        {/* Middle Canvas workspace area */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 sm:px-6 sm:py-4 flex flex-col items-center justify-center">
           {/* Active Canvas Tabs Panels */}
-          <div className="flex-grow flex items-center justify-center">
+          <div className="w-full flex items-center justify-center">
             {activeCanvasTab === 'editor' && (
               <div className={`transition-all duration-300 ease-out glass-premium rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden relative shadow-premium ${canvasAspect.wrapperClass}`}>
                 
@@ -1646,74 +1647,134 @@ export default function Studio() {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Core Prompt input tray (always visible on Panel 3 bottom) */}
-          <div className="w-full max-w-2xl mx-auto space-y-2.5 sm:space-y-3 bg-surface border border-white/5 p-3 sm:p-4 rounded-xl sm:rounded-2xl select-none shadow-premium">
+        {/* Prompt input tray & Fixed Thumb Dock (Pinned at bottom on mobile, natural flow on desktop) */}
+        <div className="shrink-0 w-full px-2 pb-2 sm:px-6 sm:pb-4 max-w-2xl mx-auto z-20">
+          <div className="w-full bg-surface border border-white/8 p-2.5 sm:p-4 rounded-xl sm:rounded-2xl select-none shadow-premium space-y-2 sm:space-y-3">
             
-            {/* Quick Templates & Ad Styles Toolbar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
-              <div className="flex items-center space-x-1.5 overflow-x-auto pr-1 scrollbar-none">
-                <span className="text-[9px] font-black uppercase text-primary-hover tracking-wider shrink-0 mr-1 flex items-center">
-                  <Sparkles className="w-3 h-3 mr-1" />
-                  Ad Style:
-                </span>
-                {adCreativeStyles.map((style) => (
-                  <button
-                    key={style.id}
-                    type="button"
-                    onClick={() => setAdStyle(style.id)}
-                    className={`px-2 py-0.5 rounded-md text-[9.5px] font-bold transition-all shrink-0 cursor-pointer border ${
-                      adStyle === style.id
-                        ? 'bg-primary text-white border-primary shadow-xs'
-                        : 'bg-white/5 text-white/60 hover:text-white border-white/5 hover:bg-white/10'
-                    }`}
-                  >
-                    {style.label}
-                  </button>
-                ))}
+            {/* DESKTOP TOOLBARS (visible on sm: and above) */}
+            <div className="hidden sm:block space-y-2.5">
+              {/* Quick Templates & Ad Styles Toolbar */}
+              <div className="flex flex-row items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                <div className="flex items-center space-x-1.5 overflow-x-auto pr-1 scrollbar-none">
+                  <span className="text-[9px] font-black uppercase text-primary-hover tracking-wider shrink-0 mr-1 flex items-center">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    Ad Style:
+                  </span>
+                  {adCreativeStyles.map((style) => (
+                    <button
+                      key={style.id}
+                      type="button"
+                      onClick={() => setAdStyle(style.id)}
+                      className={`px-2 py-0.5 rounded-md text-[9.5px] font-bold transition-all shrink-0 cursor-pointer border ${
+                        adStyle === style.id
+                          ? 'bg-primary text-white border-primary shadow-xs'
+                          : 'bg-white/5 text-white/60 hover:text-white border-white/5 hover:bg-white/10'
+                      }`}
+                    >
+                      {style.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Enhance Button */}
+                <button
+                  type="button"
+                  disabled={isEnhancing || !promptText.trim()}
+                  onClick={handleEnhancePrompt}
+                  className="flex items-center space-x-1.5 px-3 py-1 bg-gradient-to-r from-primary to-indigo-600 hover:opacity-90 text-white rounded-lg text-[10.5px] font-extrabold transition-all shadow-glow shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Transform your idea into a high-converting commercial ad prompt like ChatGPT"
+                >
+                  {isEnhancing ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3 h-3 text-yellow-300" />
+                  )}
+                  <span>{isEnhancing ? 'Enhancing...' : '🪄 Enhance for Ads'}</span>
+                </button>
               </div>
 
-              {/* Enhance Button */}
+              {/* Higgsfield Camera Motion Ribbon */}
+              {(activeMode === 'video' || activeMode === 'swap') && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-white/5 text-[9.5px]">
+                  <span className="font-black uppercase text-primary tracking-wider shrink-0 flex items-center gap-1 mr-0.5">
+                    <Camera className="w-3 h-3 text-primary" />
+                    Camera:
+                  </span>
+                  {cameraPresets.map((cam) => (
+                    <button
+                      key={cam.id}
+                      type="button"
+                      onClick={() => handleToggleCamera(cam)}
+                      className={`px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 text-xs min-h-[32px] ${
+                        selectedCamera === cam.id
+                          ? 'bg-primary text-white border-primary shadow-xs'
+                          : 'bg-white/5 text-white/60 hover:text-white border-white/10 hover:bg-white/10'
+                      }`}
+                      title={cam.text}
+                    >
+                      <span>{cam.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* MOBILE 1-ROW CONSOLIDATED CREATIVE TOOL RIBBON (< sm screens) */}
+            <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[9.5px] border-b border-white/5">
+              {/* Compact Enhance Pill */}
               <button
                 type="button"
                 disabled={isEnhancing || !promptText.trim()}
                 onClick={handleEnhancePrompt}
-                className="flex items-center space-x-1.5 px-3 py-1 bg-gradient-to-r from-primary to-indigo-600 hover:opacity-90 text-white rounded-lg text-[10.5px] font-extrabold transition-all shadow-glow shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Transform your idea into a high-converting commercial ad prompt like ChatGPT"
+                className="flex items-center space-x-1 px-2.5 py-1 bg-gradient-to-r from-primary to-indigo-600 hover:opacity-90 active:scale-95 text-white rounded-lg text-[10px] font-extrabold transition-all shadow-glow shrink-0 cursor-pointer disabled:opacity-40"
+                title="Enhance prompt for ads"
               >
-                {isEnhancing ? (
-                  <RefreshCw className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3 h-3 text-yellow-300" />
-                )}
-                <span>{isEnhancing ? 'Enhancing...' : '🪄 Enhance for Ads'}</span>
+                {isEnhancing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-yellow-300" />}
+                <span>{isEnhancing ? 'Enhancing...' : '🪄 Enhance'}</span>
               </button>
-            </div>
 
-            {/* Higgsfield Camera Motion Ribbon */}
-            {(activeMode === 'video' || activeMode === 'swap') && (
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-white/5 text-[9.5px]">
-                <span className="font-black uppercase text-primary tracking-wider shrink-0 flex items-center gap-1 mr-0.5">
-                  <Camera className="w-3 h-3 text-primary" />
-                  Camera:
-                </span>
-                {cameraPresets.map((cam) => (
-                  <button
-                    key={cam.id}
-                    type="button"
-                    onClick={() => handleToggleCamera(cam)}
-                    className={`px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 text-[10.5px] sm:text-xs min-h-[30px] sm:min-h-[32px] ${
-                      selectedCamera === cam.id
-                        ? 'bg-primary text-white border-primary shadow-xs'
-                        : 'bg-white/5 text-white/60 hover:text-white border-white/10 hover:bg-white/10'
-                    }`}
-                    title={cam.text}
-                  >
-                    <span>{cam.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+              <div className="w-[1px] h-3.5 bg-white/10 shrink-0" />
+
+              {/* Ad Styles Chips */}
+              {adCreativeStyles.map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => setAdStyle(style.id)}
+                  className={`px-2 py-1 rounded-lg text-[9.5px] font-bold transition-all shrink-0 cursor-pointer border ${
+                    adStyle === style.id
+                      ? 'bg-primary text-white border-primary shadow-xs'
+                      : 'bg-white/5 text-white/60 hover:text-white border-white/5'
+                  }`}
+                >
+                  {style.label}
+                </button>
+              ))}
+
+              {/* Camera Presets (if video/swap) */}
+              {(activeMode === 'video' || activeMode === 'swap') && (
+                <>
+                  <div className="w-[1px] h-3.5 bg-white/10 shrink-0" />
+                  {cameraPresets.map((cam) => (
+                    <button
+                      key={cam.id}
+                      type="button"
+                      onClick={() => handleToggleCamera(cam)}
+                      className={`px-2 py-1 rounded-lg font-bold border transition-all cursor-pointer flex items-center gap-1 shrink-0 text-[9.5px] ${
+                        selectedCamera === cam.id
+                          ? 'bg-primary text-white border-primary shadow-xs'
+                          : 'bg-white/5 text-white/60 hover:text-white border-white/10'
+                      }`}
+                      title={cam.text}
+                    >
+                      <span>{cam.label}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
 
             {/* Prompt Textarea */}
             <div className="relative">
@@ -1730,9 +1791,9 @@ export default function Studio() {
                 onChange={(e) => setPromptText(e.target.value)}
                 maxLength="1500"
                 rows="2"
-                className="w-full bg-surface-elevated text-xs sm:text-sm rounded-xl px-3.5 py-2.5 sm:py-3 border border-white/10 focus:outline-none focus:border-primary text-white resize-none placeholder-white/20"
+                className="w-full bg-surface-elevated text-xs sm:text-sm rounded-xl px-3 py-2 sm:px-3.5 sm:py-2.5 border border-white/10 focus:outline-none focus:border-primary text-white resize-none placeholder-white/20 min-h-[46px] sm:min-h-[58px]"
               />
-              <span className="absolute bottom-2.5 right-3 text-[10px] font-bold text-white/25">
+              <span className="absolute bottom-1.5 right-2.5 text-[9.5px] font-bold text-white/25 pointer-events-none">
                 {promptText.length}/1500
               </span>
             </div>
@@ -1746,7 +1807,7 @@ export default function Studio() {
             </div>
 
             {/* MOBILE DOCKED THUMB ACTION BAR (< lg screens only) */}
-            <div className="lg:hidden pt-2.5 border-t border-white/8 flex flex-col gap-2">
+            <div className="lg:hidden pt-2 border-t border-white/8 flex flex-col gap-2">
               {/* Quick thumb controls row: Aspect Ratio + Media Status + Settings */}
               <div className="flex items-center justify-between gap-1.5 text-xs">
                 {/* 1-Tap Aspect Ratio toggle: 9:16 vertical <-> 16:9 landscape */}
@@ -1816,7 +1877,7 @@ export default function Studio() {
                     type="button"
                     disabled={cancelling}
                     onClick={() => handleCancelGeneration()}
-                    className="flex items-center justify-center gap-1 px-3.5 py-3 bg-red-500/15 hover:bg-red-500/25 active:bg-red-500/35 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 min-h-[44px]"
+                    className="flex items-center justify-center gap-1 px-3.5 py-2.5 bg-red-500/15 hover:bg-red-500/25 active:bg-red-500/35 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 min-h-[44px]"
                     title="Cancel and refund"
                   >
                     <XCircle className="w-4 h-4" />
@@ -1838,7 +1899,7 @@ export default function Studio() {
                     imageGenerating
                   }
                   onClick={handleGenerate}
-                  className="flex-1 py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-glow cursor-pointer active:scale-98 transition-all min-h-[44px]"
+                  className="flex-1 py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-glow cursor-pointer active:scale-98 transition-all min-h-[44px]"
                 >
                   {generationStatus === 'pending' || generationStatus === 'processing' || imageGenerating ? (
                     <>
