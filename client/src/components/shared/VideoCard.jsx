@@ -189,7 +189,7 @@ export default function VideoCard({
 
   return (
     <div
-      className="relative flex flex-col bg-surface border border-white/5 rounded-xl overflow-hidden hover-scale group"
+      className="relative flex flex-col bg-[#0A0B11] border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/40 transition-all duration-300 group shadow-card"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -285,7 +285,7 @@ export default function VideoCard({
       </div>
 
       {/* ── Title & Metadata ─────────────────────────────────── */}
-      <div className="p-4 flex flex-col justify-between flex-grow">
+      <div className="p-2.5 sm:p-4 flex flex-col justify-between flex-grow">
         <div>
           <div className="flex items-start justify-between">
             <h3 className="text-xs font-bold text-white truncate max-w-[180px]" title={video.title}>

@@ -39,12 +39,12 @@ export default function Topbar({
   };
 
   return (
-    <header className="flex items-center justify-between w-full h-13 sm:h-14 md:h-16 px-2 sm:px-6 bg-surface border-b border-white/5 select-none z-30 shrink-0">
-      {/* LEFT PANEL: Editable Title */}
-      <div className="flex items-center space-x-1.5 sm:space-x-2 md:space-x-3 shrink-0 md:w-1/3 max-w-[105px] sm:max-w-none">
+    <header className="flex items-center justify-between w-full h-14 sm:h-16 px-3 sm:px-6 bg-[#000000]/90 backdrop-blur-md border-b border-white/8 select-none z-30 shrink-0">
+      {/* LEFT PANEL: Logo / Title */}
+      <div className="flex items-center space-x-2 shrink-0 max-w-[150px] sm:max-w-none">
         {onRename ? (
           isEditing ? (
-            <div className="flex items-center space-x-1 bg-surface-elevated px-2 py-1 rounded-lg border border-primary/30">
+            <div className="flex items-center space-x-1 bg-surface-elevated px-2 py-1 rounded-xl border border-primary/40">
               <input
                 type="text"
                 value={editedTitle}
@@ -52,43 +52,40 @@ export default function Topbar({
                 onBlur={handleRenameSubmit}
                 onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
                 autoFocus
-                className="bg-transparent text-xs sm:text-sm font-bold text-white focus:outline-none w-20 sm:w-44"
+                className="bg-transparent text-xs sm:text-sm font-bold text-white focus:outline-none w-24 sm:w-44"
               />
               <button onClick={handleRenameSubmit} className="text-success hover:text-green-400">
                 <Check className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center space-x-1 group">
-              <h2 className="text-[11px] sm:text-sm font-extrabold text-white tracking-wide truncate max-w-[80px] xs:max-w-[110px] sm:max-w-[200px]">
+            <div className="flex items-center space-x-1.5 group cursor-pointer" onClick={() => setIsEditing(true)}>
+              <h2 className="text-xs sm:text-sm font-extrabold text-white tracking-wide truncate max-w-[110px] sm:max-w-[200px]">
                 {title || 'Untitled Video'}
               </h2>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="opacity-70 sm:opacity-0 group-hover:opacity-100 text-white/40 hover:text-white p-0.5 sm:p-1 rounded-md transition-all cursor-pointer"
-              >
-                <Edit2 className="w-3 h-3" />
-              </button>
+              <Edit2 className="w-3 h-3 text-white/30 group-hover:text-white transition-colors" />
             </div>
           )
         ) : (
-          <h2 className="text-[11px] sm:text-sm font-extrabold text-white tracking-wider uppercase truncate max-w-[85px] xs:max-w-[120px] sm:max-w-none">
-            {title || 'BrandVox AI'}
-          </h2>
+          <div className="flex items-center space-x-1.5 cursor-pointer" onClick={() => navigate('/explore')}>
+            <h2 className="text-sm sm:text-base font-black text-white tracking-wide font-['Outfit'] flex items-center gap-1">
+              BrandVox AI <span className="text-purple-400 text-xs">✨</span>
+            </h2>
+          </div>
         )}
       </div>
 
       {/* CENTER PANEL: Sub Tab Navigation Pills */}
       <div className="flex items-center justify-center flex-1 mx-1 md:w-1/3">
         {tabs.length > 0 && setActiveTab && (
-          <div className="flex bg-surface-elevated p-0.5 sm:p-1 rounded-lg border border-white/5">
+          <div className="flex bg-[#12131D] p-1 rounded-xl border border-white/8">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-1.5 xs:px-2.5 sm:px-4 py-0.5 sm:py-1.5 text-[9.5px] xs:text-[10.5px] sm:text-xs font-semibold rounded-md tracking-wider transition-all duration-200 cursor-pointer ${
+                className={`px-2.5 sm:px-4 py-1 text-[10px] sm:text-xs font-bold rounded-lg tracking-wider transition-all duration-200 cursor-pointer ${
                   activeTab === tab.id
-                    ? 'bg-primary text-white shadow-glow'
+                    ? 'bg-gradient-purple text-white shadow-md'
                     : 'text-white/40 hover:text-white'
                 }`}
               >
@@ -99,36 +96,36 @@ export default function Topbar({
         )}
       </div>
 
-      {/* RIGHT PANEL: Balance Indicators & Primary CTA */}
-      <div className="flex items-center justify-end space-x-1 sm:space-x-3 shrink-0 md:w-1/3">
-        {/* Credits Badge */}
+      {/* RIGHT PANEL: Balance Indicators & PRO Badge */}
+      <div className="flex items-center justify-end space-x-2 shrink-0">
+        {/* Phant AI Style PRO / Credit Pill */}
         <div
           onClick={() => navigate('/credits')}
-          className="flex items-center space-x-1 sm:space-x-2 bg-surface-elevated px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-white/5 select-none cursor-pointer hover:border-white/15 transition-colors"
-          title="Credits Balance — Click to top up"
+          className="flex items-center space-x-1.5 bg-gradient-to-r from-purple-950/60 via-purple-900/40 to-indigo-950/60 hover:from-purple-900/80 hover:to-indigo-900/80 px-2.5 sm:px-3 py-1.5 rounded-full border border-purple-500/30 select-none cursor-pointer transition-all active:scale-95 shadow-sm"
+          title="Credits Balance — Click to recharge"
         >
-          <Coins className="w-3.5 h-3.5 text-warning shrink-0" />
-          <div className="flex flex-col text-right">
-            <span className="hidden sm:block text-[9px] text-white/40 uppercase font-bold tracking-wider leading-none">Balance</span>
-            <span className="text-[10px] xs:text-[11px] sm:text-xs font-black text-warning">
-              {formatCredits(profile?.credits || 0)}
-            </span>
-          </div>
+          <span className="text-[10px] font-black uppercase tracking-wider text-purple-300 flex items-center gap-1">
+            <span>💎</span> PRO
+          </span>
+          <span className="text-white/30 text-[10px]">•</span>
+          <span className="text-[11px] font-black text-white flex items-center gap-1">
+            🪙 {formatCredits(profile?.credits || 0)}
+          </span>
           <button
             onClick={(e) => {
               e.stopPropagation();
               handleSyncCredits();
             }}
-            className={`hidden sm:block text-white/40 hover:text-white transition-colors cursor-pointer ${
-              syncing ? 'animate-spin text-primary' : ''
+            className={`text-white/40 hover:text-white transition-colors cursor-pointer ml-0.5 ${
+              syncing ? 'animate-spin text-purple-400' : ''
             }`}
             title="Sync Balance"
           >
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw className="w-2.5 h-2.5" />
           </button>
         </div>
 
-        {/* Notification Bell (Hidden on small mobile since it's on bottom nav) */}
+        {/* Notification Bell (Hidden on mobile) */}
         <div className="hidden sm:block">
           <NotificationBell onOpenDrawer={onOpenNotifications} />
         </div>

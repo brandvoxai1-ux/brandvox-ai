@@ -201,50 +201,6 @@ export default function Sidebar({ toggleNotifications }) {
           )}
         </div>
       </aside>
-
-      {/* MOBILE BOTTOM NAVIGATION BAR (collapses, visible on < md screens) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface/95 backdrop-blur-md border-t border-white/5 flex items-center justify-around px-1 z-40 pb-[env(safe-area-inset-bottom)] select-none">
-        {menuItems.slice(0, 5).map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item);
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleNav(item)}
-              aria-label={item.label}
-              className={`relative flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all duration-200 active:scale-95 ${
-                active ? 'text-primary' : 'text-white/40 hover:text-white'
-              }`}
-            >
-              <Icon className="w-5.5 h-5.5" />
-              <span className="text-[10px] mt-1 font-medium">{item.label}</span>
-              {item.badge > 0 && (
-                <span className="absolute top-1 right-3 flex items-center justify-center w-4 h-4 text-[8px] font-bold text-white bg-error rounded-full border border-surface">
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        
-        {/* Mobile Profile Link */}
-        <button
-          onClick={() => navigate('/settings')}
-          aria-label="Account Settings"
-          className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 ${
-            location.pathname === '/settings' ? 'text-primary' : 'text-white/40 hover:text-white'
-          }`}
-        >
-          <div className="w-5.5 h-5.5 rounded-full bg-primary/20 border border-primary/20 overflow-hidden flex items-center justify-center">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-[9px] font-bold">{profile?.full_name?.[0]?.toUpperCase() || 'U'}</span>
-            )}
-          </div>
-          <span className="text-[10px] mt-1 font-medium">Settings</span>
-        </button>
-      </nav>
     </>
   );
 }

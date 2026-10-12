@@ -146,7 +146,7 @@ export default function Projects() {
       <div className="flex-grow overflow-y-auto p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
         
         {/* Filters and Lookups Panel */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-surface border border-white/5 p-3 sm:p-4 rounded-xl select-none">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-[#0A0B11] border border-white/10 p-3 sm:p-4 rounded-2xl select-none shadow-card">
           {/* Search bar */}
           <div className="relative w-full md:max-w-md">
             <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 transform -translate-y-1/2" />
@@ -155,7 +155,7 @@ export default function Projects() {
               placeholder="Search creation name or prompt keyword..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-surface-elevated text-xs rounded-lg px-9 py-2.5 border border-white/10 w-full focus:outline-none focus:border-primary text-white/80"
+              className="bg-black/60 text-xs rounded-xl px-9 py-2.5 border border-white/10 w-full focus:outline-none focus:border-purple-500 text-white/90 placeholder-white/30"
             />
           </div>
 
@@ -167,7 +167,7 @@ export default function Projects() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-surface-elevated text-white border border-white/10 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
+                className="bg-black/60 text-white border border-white/10 rounded-xl px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
               >
                 <option value="all">All States</option>
                 <option value="completed">Completed</option>
@@ -179,7 +179,7 @@ export default function Projects() {
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="bg-surface-elevated text-white border border-white/10 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
+              className="bg-black/60 text-white border border-white/10 rounded-xl px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
             >
               <option value="all">All Types</option>
               <option value="video">Videos</option>
@@ -191,24 +191,24 @@ export default function Projects() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="bg-surface-elevated text-white border border-white/10 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none"
+              className="bg-black/60 text-white border border-white/10 rounded-xl px-2.5 py-1.5 text-xs focus:outline-none cursor-pointer"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
             </select>
 
             {/* Layout layout toggles */}
-            <div className="flex bg-surface-elevated p-1 rounded-lg border border-white/5 space-x-1">
+            <div className="flex bg-black/60 p-1 rounded-xl border border-white/10 space-x-1">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-md cursor-pointer ${viewMode === 'grid' ? 'bg-primary text-white' : 'text-white/40'}`}
+                className={`p-1.5 rounded-lg cursor-pointer ${viewMode === 'grid' ? 'bg-gradient-purple text-white shadow-glow' : 'text-white/40'}`}
                 title="Grid visual"
               >
                 <Grid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-md cursor-pointer ${viewMode === 'list' ? 'bg-primary text-white' : 'text-white/40'}`}
+                className={`p-1.5 rounded-lg cursor-pointer ${viewMode === 'list' ? 'bg-gradient-purple text-white shadow-glow' : 'text-white/40'}`}
                 title="Table log list"
               >
                 <List className="w-4 h-4" />
@@ -225,8 +225,8 @@ export default function Projects() {
           </div>
         ) : filteredVideos.length === 0 ? (
           /* Empty state */
-          <div className="flex flex-col items-center justify-center p-12 bg-surface border border-white/5 rounded-2xl text-center space-y-4 max-w-xl mx-auto mt-10">
-            <div className="p-4 bg-primary/10 border border-primary/20 rounded-full text-primary">
+          <div className="flex flex-col items-center justify-center p-12 bg-[#0A0B11] border border-white/10 rounded-3xl text-center space-y-4 max-w-xl mx-auto mt-10 shadow-card">
+            <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-400">
               <Film className="w-8 h-8" />
             </div>
             <h3 className="text-sm font-bold text-white tracking-wide">No creations found</h3>
@@ -237,7 +237,7 @@ export default function Projects() {
         ) : viewMode === 'grid' ? (
           /* Grid View Mode */
           <div className="space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6">
               {filteredVideos.map((video) => (
                 <VideoCard
                   key={video.id}

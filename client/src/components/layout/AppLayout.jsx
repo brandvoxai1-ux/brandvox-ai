@@ -1,6 +1,7 @@
 // client/src/components/layout/AppLayout.jsx
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
+import BottomNav from './BottomNav';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Bell, X, CheckSquare, RefreshCw } from 'lucide-react';
@@ -158,6 +159,9 @@ export default function AppLayout({ children }) {
           </>
         )}
       </main>
+
+      {/* Mobile Native Bottom Navigation Dock */}
+      <BottomNav />
     </div>
   );
 }

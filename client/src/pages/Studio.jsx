@@ -230,6 +230,9 @@ export default function Studio() {
       }
       toast.success(`✨ Loaded template: "${tpl.title || 'Creative Preset'}"`);
       window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (location.state?.mode) {
+      setActiveMode(location.state.mode);
+      window.history.replaceState({}, document.title, window.location.pathname);
     } else if (location.state?.remixMedia || location.state?.remixPrompt || location.state?.prompt) {
       hasLoadedRemixRef.current = true;
       const media = location.state.remixMedia || {};
@@ -817,24 +820,24 @@ export default function Studio() {
     <>
       <div className="space-y-5">
         {/* Top-level creator mode: Video | Swap (V2V) | Image */}
-          <div className="flex bg-surface-elevated p-0.5 rounded-lg border border-white/5 text-[9.5px] font-bold uppercase tracking-wider">
-            {[
-              { id: 'video', label: 'Cinema Video', icon: Film },
-              { id: 'swap', label: 'Recast (Swap)', icon: Users },
-              { id: 'image', label: 'Image Studio', icon: Sparkles }
-            ].map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => { setActiveMode(id); }}
-                className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md transition-all cursor-pointer ${
-                  activeMode === id ? 'bg-primary text-white shadow-xs' : 'text-white/40 hover:text-white/60'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="flex bg-[#0A0B11] p-1 rounded-2xl border border-white/10 text-[10px] font-bold uppercase tracking-wider shadow-sm">
+          {[
+            { id: 'swap', label: 'Character Swap', icon: Users },
+            { id: 'video', label: 'AI Video', icon: Film },
+            { id: 'image', label: 'AI Image', icon: Sparkles }
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => { setActiveMode(id); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl transition-all cursor-pointer ${
+                activeMode === id ? 'bg-gradient-purple text-white shadow-glow font-black' : 'text-white/40 hover:text-white/70'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span className="truncate">{label}</span>
+            </button>
+          ))}
+        </div>
 
           {/* MEDIA UPLOAD — Text/Image-to-Video mode */}
           {activeMode === 'video' && (
@@ -1343,7 +1346,7 @@ export default function Studio() {
                 </button>
               )}
               <Button
-                variant="primary"
+                variant="purple"
                 size="md"
                 disabled={
                   (activeMode === 'swap' 
@@ -1368,23 +1371,23 @@ export default function Studio() {
         />
 
         {/* Mobile Quick Mode Selector & Settings Ribbon (< lg screens only) */}
-        <div className="lg:hidden px-2 pt-2 shrink-0">
-          <div className="flex items-center justify-between gap-1.5 bg-surface-elevated/90 backdrop-blur-md p-1.5 rounded-xl border border-white/8 text-xs select-none shadow-sm">
-            <div className="flex bg-black/40 p-0.5 rounded-lg border border-white/5 text-[10px] font-bold uppercase tracking-wider flex-1">
+        <div className="lg:hidden px-3 pt-2 shrink-0">
+          <div className="flex items-center justify-between gap-2 bg-[#0A0B11]/90 backdrop-blur-md p-1.5 rounded-2xl border border-white/10 text-xs select-none shadow-card">
+            <div className="flex bg-black/60 p-1 rounded-xl border border-white/5 text-[10px] font-extrabold uppercase tracking-wider flex-1">
               {[
-                { id: 'video', label: 'Cinema', icon: Film },
-                { id: 'swap', label: 'Recast', icon: Users },
-                { id: 'image', label: 'Image', icon: Sparkles }
+                { id: 'swap', label: 'Character Swap', icon: Users },
+                { id: 'video', label: 'AI Video', icon: Film },
+                { id: 'image', label: 'AI Image', icon: Sparkles }
               ].map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setActiveMode(id)}
-                  className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-md transition-all cursor-pointer ${
-                    activeMode === id ? 'bg-primary text-white shadow-xs' : 'text-white/40 hover:text-white/70'
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all cursor-pointer ${
+                    activeMode === id ? 'bg-gradient-purple text-white shadow-glow font-extrabold' : 'text-white/40 hover:text-white/70'
                   }`}
                 >
-                  <Icon className="w-3 h-3" />
-                  <span>{label}</span>
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="truncate">{label}</span>
                 </button>
               ))}
             </div>
@@ -1392,11 +1395,11 @@ export default function Studio() {
             <button
               type="button"
               onClick={() => setMobileControlsOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/80 rounded-lg text-[10.5px] font-bold transition-all border border-white/8 shrink-0 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/90 rounded-xl text-xs font-bold transition-all border border-white/10 shrink-0 cursor-pointer"
               title="Open studio settings"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-primary-hover" />
-              <span className="text-[10px] font-black">{aspectRatio}</span>
+              <SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-[11px] font-black">{aspectRatio}</span>
             </button>
           </div>
         </div>
@@ -1887,7 +1890,7 @@ export default function Studio() {
                 )}
 
                 <Button
-                  variant="primary"
+                  variant="purple"
                   size="lg"
                   disabled={
                     (activeMode === 'swap'
@@ -1900,7 +1903,7 @@ export default function Studio() {
                     imageGenerating
                   }
                   onClick={handleGenerate}
-                  className="flex-1 py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-glow cursor-pointer active:scale-98 transition-all min-h-[44px]"
+                  className="flex-1 py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer active:scale-98 transition-all min-h-[48px]"
                 >
                   {generationStatus === 'pending' || generationStatus === 'processing' || imageGenerating ? (
                     <>
@@ -1911,7 +1914,7 @@ export default function Studio() {
                     <>
                       <Sparkles className="w-4 h-4 text-yellow-300" />
                       <span>{activeMode === 'swap' ? 'Recast Video' : activeMode === 'image' ? 'Generate Image' : 'Compose Video'}</span>
-                      <span className="bg-black/35 px-2 py-0.5 rounded text-[10.5px] font-extrabold text-white/90">
+                      <span className="bg-black/40 px-2 py-0.5 rounded-lg text-[10.5px] font-extrabold text-white/90">
                         {formatCredits(cost)}
                       </span>
                     </>
