@@ -604,10 +604,15 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
         let readyVideoUrl = source_video_url;
         try {
           const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
-          readyVideoUrl = await ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase, model.id || model.fal_endpoint);
+          // Strict 15s timeout race so conforming can NEVER block dispatching to Replicate
+          readyVideoUrl = await Promise.race([
+            ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase, model.id || model.fal_endpoint),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Conformance check timed out')), 15000))
+          ]);
           console.log(`[CharacterSwap] Using verified reference video URL: ${readyVideoUrl}`);
         } catch (vProcErr) {
           console.warn('[CharacterSwap] Video processor warning, using source URL:', vProcErr.message);
+          readyVideoUrl = source_video_url;
         }
 
         const result = await replicateService.generateCharacterSwapVideo({
@@ -618,6 +623,7 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
           prop_image: prop_image_url,
           prompt,
           aspect_ratio: aspect_ratio || '16:9',
+          resolution: generation.resolution || '720p',
           webhookUrl,
           generationId: generation.id
         });
@@ -629,39 +635,35 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
             .update({ fal_request_id: result.request_id })
             .eq('id', generation.id);
 
-          // Local webhook simulation / polling
-          const isLocalhost = webhookUrl.includes('localhost') || webhookUrl.includes('127.0.0.1');
-          if (isLocalhost) {
-            console.log(`[CharacterSwap] Localhost environment detected. Initiating background prediction polling for: ${result.request_id}`);
-            (async () => {
-              try {
-                let status = 'starting';
-                let currentResult = null;
+          // Background prediction tracking (runs on both localhost and production as webhook fallback)
+          console.log(`[CharacterSwap] Initiating background prediction tracking for: ${result.request_id}`);
+          (async () => {
+            try {
+              let status = 'starting';
+              let currentResult = null;
 
-                // Poll status every 3 seconds up to 120 times (6 minutes limit)
-                for (let attempt = 0; attempt < 120; attempt++) {
-                  await new Promise(resolve => setTimeout(resolve, 3000));
-                  currentResult = await replicateService.getPredictionStatus(result.request_id);
-                  status = currentResult.status;
+              // Poll status every 4 seconds up to 120 times (8 minutes limit)
+              for (let attempt = 0; attempt < 120; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, 4000));
+                currentResult = await replicateService.getPredictionStatus(result.request_id);
+                status = currentResult.status;
 
-                  if (status === 'succeeded' || status === 'failed' || status === 'canceled') {
-                    break;
-                  }
+                if (status === 'succeeded' || status === 'failed' || status === 'canceled') {
+                  break;
                 }
-
-                if (status === 'succeeded') {
-                  console.log(`[CharacterSwap] Local poll completed successfully for: ${generation.id}`);
-                  await handleWebhookLogic(generation.id, 'OK', currentResult.output, null);
-                } else {
-                  console.error(`[CharacterSwap] Local poll failed/timed out for: ${generation.id}. Status: ${status}`);
-                  await handleWebhookLogic(generation.id, 'ERROR', null, currentResult?.error || 'Replicate polling timeout or failed');
-                }
-              } catch (pollErr) {
-                console.error(`[CharacterSwap] Local poll critical error for: ${generation.id}`, pollErr);
-                await handleWebhookLogic(generation.id, 'ERROR', null, pollErr.message);
               }
-            })();
-          }
+
+              if (status === 'succeeded') {
+                console.log(`[CharacterSwap] Background tracking completed successfully for: ${generation.id}`);
+                await handleWebhookLogic(generation.id, 'OK', currentResult.output, null);
+              } else if (status === 'failed' || status === 'canceled') {
+                console.error(`[CharacterSwap] Background tracking prediction ended with ${status} for: ${generation.id}`);
+                await handleWebhookLogic(generation.id, 'ERROR', null, currentResult?.error || 'Replicate prediction failed');
+              }
+            } catch (pollErr) {
+              console.error(`[CharacterSwap] Tracking error for: ${generation.id}`, pollErr.message);
+            }
+          })();
         } else if (result.video_url) {
           const placeholderThumb = 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500';
           await supabase
@@ -964,7 +966,7 @@ router.post('/webhook', async (req, res) => {
  */
 router.get('/:id/status', authMiddleware, async (req, res) => {
   try {
-    const { data: gen, error } = await supabase
+    let { data: gen, error } = await supabase
       .from('generations')
       .select('*')
       .eq('id', req.params.id)
@@ -973,6 +975,28 @@ router.get('/:id/status', authMiddleware, async (req, res) => {
 
     if (error || !gen) {
       return res.status(404).json({ error: 'Video generation record not found.' });
+    }
+
+    // Proactive sync: if generation is still pending/processing and has a provider prediction ID, check status
+    if ((gen.status === 'processing' || gen.status === 'pending') && gen.fal_request_id) {
+      try {
+        const pred = await replicateService.getPredictionStatus(gen.fal_request_id);
+        if (pred && (pred.status === 'succeeded' || pred.status === 'failed' || pred.status === 'canceled')) {
+          if (pred.status === 'succeeded') {
+            await handleWebhookLogic(gen.id, 'OK', pred.output, null);
+          } else {
+            await handleWebhookLogic(gen.id, 'ERROR', null, pred.error || 'Prediction finished with failure');
+          }
+          const { data: refreshed } = await supabase
+            .from('generations')
+            .select('*')
+            .eq('id', gen.id)
+            .single();
+          if (refreshed) gen = refreshed;
+        }
+      } catch (checkErr) {
+        // Silently continue serving current DB record if provider status check is transiently unavailable
+      }
     }
 
     // Dynamic watermark check

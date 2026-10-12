@@ -5,7 +5,14 @@ const path = require('path');
 const os = require('os');
 const { promisify } = require('util');
 const axios = require('axios');
-const execPromise = promisify(exec);
+function execWithTimeout(cmd, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    exec(cmd, { timeout: timeoutMs }, (error, stdout, stderr) => {
+      if (error) return reject(error);
+      resolve({ stdout, stderr });
+    });
+  });
+}
 
 /**
  * Probes a video file using ffprobe to retrieve width, height, and duration.
@@ -15,7 +22,7 @@ const execPromise = promisify(exec);
 async function probeVideo(filePath) {
   try {
     const cmd = `ffprobe -v error -select_streams v:0 -show_entries stream=width,height,duration,sample_aspect_ratio -of json "${filePath}"`;
-    const { stdout } = await execPromise(cmd);
+    const { stdout } = await execWithTimeout(cmd, 6000);
     const data = JSON.parse(stdout);
     const stream = data?.streams?.[0];
     if (!stream) {
@@ -28,7 +35,7 @@ async function probeVideo(filePath) {
       sar: stream.sample_aspect_ratio || '1:1'
     };
   } catch (error) {
-    console.warn('[videoProcessor] ffprobe failed:', error.message);
+    console.warn('[videoProcessor] ffprobe check skipped or unavailable:', error.message);
     return null;
   }
 }
@@ -101,7 +108,7 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
     const ffmpegCmd = `ffmpeg -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
 
     console.log(`[videoProcessor] Running FFmpeg optimization: ${ffmpegCmd}`);
-    await execPromise(ffmpegCmd);
+    await execWithTimeout(ffmpegCmd, 20000);
 
     if (fs.existsSync(outputPath)) {
       const outputBuffer = fs.readFileSync(outputPath);
@@ -116,7 +123,7 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
 
     return { buffer: inputBuffer, processed: false };
   } catch (err) {
-    console.error('[videoProcessor] Video processing failed, falling back to original:', err.message);
+    console.warn('[videoProcessor] Video processing skipped/fallback:', err.message);
     return { buffer: inputBuffer, processed: false };
   } finally {
     try {
@@ -147,10 +154,10 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, tar
 
     console.log(`[videoProcessor] Checking compatibility for reference video: ${videoUrl} (model: ${targetModelId || 'generic'}, maxDuration: ${maxDuration || 'unlimited'})`);
     
-    // Download video
+    // Download video with strict 15s timeout
     const response = await axios.get(videoUrl, {
       responseType: 'arraybuffer',
-      timeout: 60000,
+      timeout: 15000,
       maxContentLength: 250 * 1024 * 1024,
       maxBodyLength: 250 * 1024 * 1024
     });

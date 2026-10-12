@@ -215,6 +215,7 @@ async function generateCharacterSwapVideo({
   prop_image,
   prompt,
   aspect_ratio = '16:9',
+  resolution = '720p',
   webhookUrl,
   generationId
 }) {
@@ -323,7 +324,7 @@ async function generateCharacterSwapVideo({
       input.video_reference_type = 'base';
       input.keep_original_sound = true;
     }
-    input.mode = 'pro';
+    input.mode = (resolution === '1080p') ? 'pro' : 'standard';
   }
 
   try {
