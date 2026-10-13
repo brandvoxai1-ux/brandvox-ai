@@ -604,10 +604,10 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
         let readyVideoUrl = source_video_url;
         try {
           const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
-          // Strict 15s timeout race so conforming can NEVER block dispatching to Replicate
+          // 45s timeout race so video conformance can reliably finish
           readyVideoUrl = await Promise.race([
             ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase, model.id || model.fal_endpoint),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Conformance check timed out')), 15000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Conformance check timed out')), 45000))
           ]);
           console.log(`[CharacterSwap] Using verified reference video URL: ${readyVideoUrl}`);
         } catch (vProcErr) {

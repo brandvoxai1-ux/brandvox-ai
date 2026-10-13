@@ -13,6 +13,7 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(value || null);
   const [fileName, setFileName] = useState('');
+  const [videoDuration, setVideoDuration] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -37,6 +38,34 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
     const localPreview = URL.createObjectURL(file);
     setPreview(localPreview);
 
+    // Inspect video duration on client before sending
+    try {
+      const meta = await new Promise((resolve) => {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => {
+          resolve({ duration: v.duration, width: v.videoWidth, height: v.videoHeight });
+        };
+        v.onerror = () => resolve(null);
+        v.src = localPreview;
+      });
+
+      if (meta && typeof meta.duration === 'number' && !isNaN(meta.duration)) {
+        setVideoDuration(meta.duration);
+        if (meta.duration > 9.5) {
+          toast(
+            `Clip is ${meta.duration.toFixed(1)}s. Our AI pipeline will auto-trim the first 9.5s to fit Kling & Seedance limits perfectly.`,
+            { icon: '✂️', duration: 4500 }
+          );
+        } else if (meta.duration < 2.5) {
+          toast(
+            `Clip is ${meta.duration.toFixed(1)}s. AI engine requires at least 3s and will auto-loop frames.`,
+            { icon: '🔄', duration: 4000 }
+          );
+        }
+      }
+    } catch (_) {}
+
     setUploading(true);
 
     try {
@@ -55,6 +84,7 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
     } catch (err) {
       setPreview(null);
       setFileName('');
+      setVideoDuration(null);
       toast.error(err?.response?.data?.error || 'Video upload failed. Please try again.');
     } finally {
       setUploading(false);
@@ -79,6 +109,7 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
   const handleClear = () => {
     setPreview(null);
     setFileName('');
+    setVideoDuration(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     onUrlReady('');
     if (onClear) onClear();
@@ -103,12 +134,21 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
           >
             <X className="w-3.5 h-3.5" />
           </button>
-          {uploading && (
-            <div className="absolute top-2 left-2 bg-black/85 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-bold text-primary flex items-center gap-1 border border-primary/20 shadow-md">
-              <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />
-              <span>Syncing...</span>
-            </div>
-          )}
+          
+          {/* Status & Duration Badge */}
+          <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10 pointer-events-none">
+            {uploading ? (
+              <div className="bg-black/85 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-bold text-primary flex items-center gap-1 border border-primary/20 shadow-md">
+                <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />
+                <span>Syncing & Conforming...</span>
+              </div>
+            ) : videoDuration ? (
+              <div className="bg-black/85 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-bold text-purple-300 flex items-center gap-1 border border-purple-500/30 shadow-md">
+                <span>⏱️ {videoDuration > 9.5 ? 'Capped: 9.5s' : `${videoDuration.toFixed(1)}s`}</span>
+              </div>
+            ) : null}
+          </div>
+
           <div className="absolute bottom-2 left-2 bg-black/80 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-bold text-white/90 uppercase tracking-wider flex items-center gap-1.5">
             <VideoIcon className="w-3 h-3 text-primary" />
             <span className="truncate max-w-[150px]">{fileName || 'Source Motion Video'}</span>

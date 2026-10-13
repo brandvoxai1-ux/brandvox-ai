@@ -5,7 +5,20 @@ const path = require('path');
 const os = require('os');
 const { promisify } = require('util');
 const axios = require('axios');
-function execWithTimeout(cmd, timeoutMs = 15000) {
+let ffmpegPath = 'ffmpeg';
+let ffprobePath = 'ffprobe';
+
+try {
+  const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+  if (ffmpegInstaller && ffmpegInstaller.path) ffmpegPath = ffmpegInstaller.path;
+} catch (e) {}
+
+try {
+  const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
+  if (ffprobeInstaller && ffprobeInstaller.path) ffprobePath = ffprobeInstaller.path;
+} catch (e) {}
+
+function execWithTimeout(cmd, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     exec(cmd, { timeout: timeoutMs }, (error, stdout, stderr) => {
       if (error) return reject(error);
@@ -21,8 +34,8 @@ function execWithTimeout(cmd, timeoutMs = 15000) {
  */
 async function probeVideo(filePath) {
   try {
-    const cmd = `ffprobe -v error -select_streams v:0 -show_entries stream=width,height,duration,sample_aspect_ratio -of json "${filePath}"`;
-    const { stdout } = await execWithTimeout(cmd, 6000);
+    const cmd = `"${ffprobePath}" -v error -select_streams v:0 -show_entries stream=width,height,duration,sample_aspect_ratio -of json "${filePath}"`;
+    const { stdout } = await execWithTimeout(cmd, 10000);
     const data = JSON.parse(stdout);
     const stream = data?.streams?.[0];
     if (!stream) {
@@ -105,10 +118,10 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
     const loopCount = needsLoop ? Math.max(1, Math.ceil(2.5 / Math.max(0.5, duration)) - 1) : 0;
     const loopArg = loopCount > 0 ? `-stream_loop ${loopCount} ` : '';
     const durationLimit = needsLoop ? '-t 3' : (needsDurationCap ? `-t ${maxDuration}` : '');
-    const ffmpegCmd = `ffmpeg -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
+    const ffmpegCmd = `"${ffmpegPath}" -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
 
     console.log(`[videoProcessor] Running FFmpeg optimization: ${ffmpegCmd}`);
-    await execWithTimeout(ffmpegCmd, 20000);
+    await execWithTimeout(ffmpegCmd, 35000);
 
     if (fs.existsSync(outputPath)) {
       const outputBuffer = fs.readFileSync(outputPath);
@@ -148,16 +161,15 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, tar
   if (!videoUrl || typeof videoUrl !== 'string') return videoUrl;
 
   try {
-    const isKling = targetModelId && String(targetModelId).toLowerCase().includes('kling');
-    // Kling requires reference videos between 3s and 10s. For Kling, cap at 9.9s so upstream E006 is avoided.
-    const maxDuration = isKling ? 9.9 : null;
+    // Strictly cap at 9.5s so Kling's 10.0s check (and float duration rounding) NEVER fails with E006
+    const maxDuration = 9.5;
 
-    console.log(`[videoProcessor] Checking compatibility for reference video: ${videoUrl} (model: ${targetModelId || 'generic'}, maxDuration: ${maxDuration || 'unlimited'})`);
+    console.log(`[videoProcessor] Checking compatibility for reference video: ${videoUrl} (model: ${targetModelId || 'generic'}, maxDuration: ${maxDuration}s)`);
     
-    // Download video with strict 15s timeout
+    // Download video with generous 35s timeout
     const response = await axios.get(videoUrl, {
       responseType: 'arraybuffer',
-      timeout: 15000,
+      timeout: 35000,
       maxContentLength: 250 * 1024 * 1024,
       maxBodyLength: 250 * 1024 * 1024
     });
