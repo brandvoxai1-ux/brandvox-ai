@@ -894,6 +894,27 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
           if (fallbackResult.request_id) {
             await supabase.from('generations').update({ fal_request_id: fallbackResult.request_id }).eq('id', gen.id);
             console.log(`[WebhookLogic] Fallback prediction queued on MiniMax: ${fallbackResult.request_id}`);
+
+            (async () => {
+              try {
+                let mStatus = 'starting';
+                let mResult = null;
+                for (let attempt = 0; attempt < 120; attempt++) {
+                  await new Promise(r => setTimeout(r, 4000));
+                  mResult = await replicateService.getPredictionStatus(fallbackResult.request_id);
+                  mStatus = mResult.status;
+                  if (mStatus === 'succeeded' || mStatus === 'failed' || mStatus === 'canceled') break;
+                }
+                if (mStatus === 'succeeded') {
+                  await handleWebhookLogic(gen.id, 'OK', mResult.output, null);
+                } else if (mStatus === 'failed' || mStatus === 'canceled') {
+                  await handleWebhookLogic(gen.id, 'ERROR', null, mResult?.error || 'MiniMax fallback prediction failed');
+                }
+              } catch (mErr) {
+                console.error(`[WebhookLogic] Tracking error for MiniMax fallback ${fallbackResult.request_id}:`, mErr.message);
+              }
+            })();
+
             return;
           } else if (fallbackResult.video_url) {
             await handleWebhookLogic(gen.id, 'OK', fallbackResult.video_url, null);
@@ -901,6 +922,82 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
           }
         } catch (fallbackErr) {
           console.error('[WebhookLogic] Fallback to MiniMax also failed:', fallbackErr);
+        }
+      }
+
+      // Auto-fallback for character swap: if Seedance 2.5 fails, automatically retry on Kling 3.0 Omni (or vice versa)
+      if (gen.generation_type === 'swap' && !gen.error_message?.includes('[swap-fallback-attempted]')) {
+        const currentModel = String(gen.model_name || gen.model_id || '').toLowerCase();
+        const fallbackTarget = currentModel.includes('seedance')
+          ? 'kwaivgi/kling-v3-omni-video'
+          : 'bytedance/seedance-2.5';
+        const fallbackDisplayName = fallbackTarget.includes('kling') ? 'Kling 3.0 Omni (Auto-Protected)' : 'Seedance 2.5 (Auto-Protected)';
+
+        console.log(`[WebhookLogic] Character swap attempt on ${currentModel} failed (${errorMsg}). Retrying with alternate engine ${fallbackTarget}...`);
+        try {
+          await supabase.from('generations').update({
+            model_id: fallbackTarget.includes('kling') ? 'kling-3-omni' : 'seedance-2.5',
+            model_name: fallbackDisplayName,
+            error_message: `[swap-fallback-attempted] Retrying on ${fallbackDisplayName}`
+          }).eq('id', generationId);
+
+          const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
+          const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
+
+          let videoUrlToUse = gen.source_video_url;
+          try {
+            const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
+            videoUrlToUse = await ensureCompatibleReferenceVideoUrl(gen.source_video_url, gen.user_id, supabase, fallbackTarget);
+          } catch (vpErr) {
+            console.warn('[WebhookLogic] Conformance check skipped:', vpErr.message);
+          }
+
+          const fallbackResult = await replicateService.generateCharacterSwapVideo({
+            endpoint: fallbackTarget,
+            source_video: videoUrlToUse,
+            target_character: gen.input_image_url,
+            characters: gen.characters || [],
+            prompt: gen.prompt,
+            aspect_ratio: gen.aspect_ratio || '16:9',
+            resolution: gen.resolution || '720p',
+            webhookUrl,
+            generationId: gen.id
+          });
+
+          if (fallbackResult.request_id) {
+            await supabase.from('generations').update({
+              fal_request_id: fallbackResult.request_id,
+              model_name: fallbackResult.model_used || fallbackDisplayName
+            }).eq('id', gen.id);
+            console.log(`[WebhookLogic] Swap fallback prediction queued on ${fallbackTarget}: ${fallbackResult.request_id}`);
+
+            (async () => {
+              try {
+                let fStatus = 'starting';
+                let fResult = null;
+                for (let attempt = 0; attempt < 120; attempt++) {
+                  await new Promise(r => setTimeout(r, 4000));
+                  fResult = await replicateService.getPredictionStatus(fallbackResult.request_id);
+                  fStatus = fResult.status;
+                  if (fStatus === 'succeeded' || fStatus === 'failed' || fStatus === 'canceled') break;
+                }
+                if (fStatus === 'succeeded') {
+                  await handleWebhookLogic(gen.id, 'OK', fResult.output, null);
+                } else if (fStatus === 'failed' || fStatus === 'canceled') {
+                  await handleWebhookLogic(gen.id, 'ERROR', null, fResult?.error || 'Fallback prediction failed');
+                }
+              } catch (fErr) {
+                console.error(`[WebhookLogic] Tracking error for swap fallback ${fallbackResult.request_id}:`, fErr.message);
+              }
+            })();
+
+            return;
+          } else if (fallbackResult.video_url) {
+            await handleWebhookLogic(gen.id, 'OK', fallbackResult.video_url, null);
+            return;
+          }
+        } catch (swapFallbackErr) {
+          console.error('[WebhookLogic] Swap fallback attempt encountered error:', swapFallbackErr);
         }
       }
 

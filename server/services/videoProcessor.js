@@ -10,12 +10,22 @@ let ffprobePath = 'ffprobe';
 
 try {
   const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-  if (ffmpegInstaller && ffmpegInstaller.path) ffmpegPath = ffmpegInstaller.path;
+  if (ffmpegInstaller && ffmpegInstaller.path) {
+    ffmpegPath = ffmpegInstaller.path;
+    if (process.platform !== 'win32' && fs.existsSync(ffmpegPath)) {
+      try { fs.chmodSync(ffmpegPath, 0o755); } catch (e) {}
+    }
+  }
 } catch (e) {}
 
 try {
   const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
-  if (ffprobeInstaller && ffprobeInstaller.path) ffprobePath = ffprobeInstaller.path;
+  if (ffprobeInstaller && ffprobeInstaller.path) {
+    ffprobePath = ffprobeInstaller.path;
+    if (process.platform !== 'win32' && fs.existsSync(ffprobePath)) {
+      try { fs.chmodSync(ffprobePath, 0o755); } catch (e) {}
+    }
+  }
 } catch (e) {}
 
 function execWithTimeout(cmd, timeoutMs = 20000) {
@@ -75,7 +85,19 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
     const info = await probeVideo(inputPath);
 
     if (!info || !info.width || !info.height) {
-      console.warn('[videoProcessor] Could not probe video metadata; passing original buffer.');
+      console.warn('[videoProcessor] Could not probe video metadata; executing safe HD & duration conform...');
+      try {
+        const durationLimit = maxDuration ? `-t ${maxDuration}` : '-t 9.5';
+        const fallbackCmd = `"${ffmpegPath}" -y -i "${inputPath}" ${durationLimit} -vf "scale='if(lt(iw,720),720,iw)':-2,setsar=1" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
+        await execWithTimeout(fallbackCmd, 35000);
+        if (fs.existsSync(outputPath)) {
+          const outputBuffer = fs.readFileSync(outputPath);
+          console.log(`[videoProcessor] Fallback conform succeeded: ${outputBuffer.length} bytes`);
+          return { buffer: outputBuffer, processed: true };
+        }
+      } catch (safeErr) {
+        console.warn('[videoProcessor] Fallback conform failed:', safeErr.message);
+      }
       return { buffer: inputBuffer, processed: false };
     }
 

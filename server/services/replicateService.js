@@ -46,14 +46,14 @@ const REPLICATE_MODEL_MAP = {
   'wan-video/wan-2.1': 'wan-video/wan-2.1-1.3b',
   'wan-3': 'wan-video/wan-2.1-1.3b',
   'fal-ai/hunyuan-video': 'wan-video/wan-2.1-1.3b',
-  'seedance-2-0-fast': 'bytedance/seedance-2.0',
-  'seedance-2-fast': 'bytedance/seedance-2.0',
-  'seedance-2': 'bytedance/seedance-2.0',
-  'seedance-2-i2v': 'bytedance/seedance-2.0',
-  'bytedance/seedance-2.0/fast/text-to-video': 'bytedance/seedance-2.0',
-  'bytedance/seedance-2.0/text-to-video': 'bytedance/seedance-2.0',
-  'bytedance/seedance-2.0/image-to-video': 'bytedance/seedance-2.0',
-  'bytedance/seedance-2.0': 'bytedance/seedance-2.0',
+  'seedance-2-0-fast': 'bytedance/seedance-2.5',
+  'seedance-2-fast': 'bytedance/seedance-2.5',
+  'seedance-2': 'bytedance/seedance-2.5',
+  'seedance-2-i2v': 'bytedance/seedance-2.5',
+  'bytedance/seedance-2.0/fast/text-to-video': 'bytedance/seedance-2.5',
+  'bytedance/seedance-2.0/text-to-video': 'bytedance/seedance-2.5',
+  'bytedance/seedance-2.0/image-to-video': 'bytedance/seedance-2.5',
+  'bytedance/seedance-2.0': 'bytedance/seedance-2.5',
   'seedance-2-5': 'bytedance/seedance-2.5',
   'seedance-2.5': 'bytedance/seedance-2.5',
   'bytedance/seedance-2.5': 'bytedance/seedance-2.5'
@@ -291,6 +291,8 @@ async function generateCharacterSwapVideo({
       }
       if (source_video) input.reference_videos = [source_video];
       input.resolution = '720p';
+      input.duration = -1; // CRITICAL: Seedance 2.5 editing mode strictly requires -1 (omitting causes E006)
+      input.aspect_ratio = 'adaptive'; // CRITICAL: Seedance 2.5 editing mode strictly requires adaptive (omitting causes E006)
       input.generate_audio = true;
     } else {
       // Kling v3 Omni Director
@@ -310,11 +312,11 @@ async function generateCharacterSwapVideo({
           }).join(', and ');
           input.prompt = `Multi-character replacement in video: ${directives}${propDirective}. ${userPromptTranslated || 'photorealistic motion transfer'}`;
         }
-        input.reference_images = allReferenceImages;
+        input.reference_images = allReferenceImages.slice(0, 4);
       } else {
         input.prompt = userPromptTranslated || 'Transform character in video, photorealistic motion transfer';
         if (hasPropImage) {
-          input.reference_images = allReferenceImages;
+          input.reference_images = allReferenceImages.slice(0, 4);
         }
       }
       if (source_video) {
