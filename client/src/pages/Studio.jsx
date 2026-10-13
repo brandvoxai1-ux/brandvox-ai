@@ -125,6 +125,19 @@ export default function Studio() {
     } else {
       setSwapCharacters([]);
     }
+    if (vid) {
+      if (vid.duration && !isNaN(vid.duration)) {
+        const naturalDur = Math.round(vid.duration);
+        const maxForModel = Number(selectedModel?.max_duration) || 10;
+        const clampedDur = Math.max(3, Math.min(maxForModel, naturalDur));
+        setDuration(clampedDur);
+        if (naturalDur > maxForModel) {
+          toast(`Source video is ${naturalDur}s: auto-trimmed to ${maxForModel}s (${selectedModel?.name || 'AI'} tensor limit)`, { icon: '⏱️', duration: 3500 });
+        } else {
+          toast(`Detected source video length: ${clampedDur}s`, { icon: '⏱️', duration: 2500 });
+        }
+      }
+    }
     if (vid && img) {
       setActiveMode('swap');
     } else if (img && !vid) {
@@ -963,9 +976,19 @@ export default function Studio() {
             <div className="w-5 h-5 rounded-md bg-yellow-400/10 text-yellow-400 flex items-center justify-center shrink-0">
               <Sparkles className="w-3 h-3" />
             </div>
-            <span className="text-xs font-bold text-white truncate">
-              {selectedModel?.name || 'Kling 3.0 Omni Director'}
-            </span>
+            <div className="text-left min-w-0">
+              <span className="text-xs font-bold text-white truncate block">
+                {selectedModel?.name || 'Kling 3.0 Omni Director'}
+              </span>
+              {selectedModel && (
+                <span className="text-[9px] text-white/40 font-bold block uppercase tracking-wider">
+                  {selectedModel.model_type === 'image'
+                    ? 'Flat cost'
+                    : `${selectedModel.supported_resolutions?.slice(-1)[0]?.toUpperCase() || '720P'} · ${Number(selectedModel.max_duration) || 10}s max`
+                  }
+                </span>
+              )}
+            </div>
           </div>
           <ChevronRight className={`w-3.5 h-3.5 text-white/40 transition-transform ${modelPickerOpen ? 'rotate-90' : ''}`} />
         </button>
@@ -984,7 +1007,12 @@ export default function Studio() {
               >
                 <div className="truncate">
                   <p className="truncate font-medium">{model.name}</p>
-                  <p className="text-[9px] text-white/40 uppercase">{model.supported_resolutions?.slice(-1)[0] || '720P'}</p>
+                  <p className="text-[9px] text-white/40 uppercase">
+                    {model.model_type === 'image'
+                      ? 'Image Model'
+                      : `${model.supported_resolutions?.slice(-1)[0] || '720P'} · ${Number(model.max_duration) || 10}s max`
+                    }
+                  </p>
                 </div>
                 {selectedModel?.id === model.id && <Check className="w-3.5 h-3.5 text-yellow-400 shrink-0" />}
               </button>
@@ -1001,12 +1029,23 @@ export default function Studio() {
           <button
             type="button"
             onClick={() => {
-              const options = [5, 8, 10];
-              const next = options[(options.indexOf(duration) + 1) % options.length] || 5;
+              const maxAllowed = Number(selectedModel?.max_duration) || 10;
+              if (selectedModel?.id === 'minimax-hailuo') {
+                toast('MiniMax Hailuo generates fixed 6s video clips', { icon: 'ℹ️' });
+                return;
+              }
+              let options = [5, 10];
+              if (maxAllowed <= 5) options = [5];
+              else if (maxAllowed <= 6) options = [6];
+              else if (maxAllowed >= 15) options = [5, 10, 15];
+
+              const currentIdx = options.indexOf(duration);
+              const next = options[(currentIdx + 1) % options.length] || options[0];
               setDuration(next);
+              toast(`Duration set to ${next}s`, { icon: '⏱️', duration: 1200 });
             }}
             className="flex items-center justify-center gap-1 py-2 px-1 rounded-xl bg-[#121316] border border-white/10 hover:border-white/20 text-xs font-semibold text-white/80 transition-colors cursor-pointer"
-            title="Click to cycle duration: 5s, 8s, 10s"
+            title={`Click to cycle duration (${selectedModel?.name || 'Model'}: max ${Number(selectedModel?.max_duration) || 10}s)`}
           >
             <Clock className="w-3 h-3 text-white/40" />
             <span>{duration}s</span>
