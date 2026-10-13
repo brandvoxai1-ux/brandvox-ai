@@ -519,9 +519,16 @@ export default function Studio() {
     setGenerationStatus('pending');
     setGenerationProgress(10);
     
+    let isPolling = false;
+    let failureCount = 0;
+
     let interval = setInterval(async () => {
+      if (isPolling) return;
+      isPolling = true;
+
       try {
         const res = await getStatus(activeGenerationId);
+        failureCount = 0; // Reset on success
         
         if (res.status === 'processing') {
           setGenerationStatus('processing');
@@ -558,6 +565,15 @@ export default function Studio() {
         }
       } catch (err) {
         console.error('Polling check failed:', err);
+        failureCount++;
+        // If generation record does not exist (404) or fails 5 consecutive times, gracefully terminate polling
+        if (err.response?.status === 404 || failureCount >= 5) {
+          console.warn('[Studio] Terminating polling loop for:', activeGenerationId);
+          setActiveGenerationId(null);
+          setGenerationStatus('idle');
+        }
+      } finally {
+        isPolling = false;
       }
     }, 3000);
 

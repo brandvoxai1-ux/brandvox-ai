@@ -62,7 +62,7 @@ export function useGeneration() {
 
   const getStatus = async (id) => {
     try {
-      const res = await api.get(`/generate/${id}/status`);
+      const res = await api.get(`/generate/${id}/status`, { timeout: 15000 });
       return res.data;
     } catch (err) {
       console.error('[useGeneration] Status inquiry failed:', err);

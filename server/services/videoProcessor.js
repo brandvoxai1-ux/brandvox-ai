@@ -182,6 +182,11 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
 async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, targetModelId = null) {
   if (!videoUrl || typeof videoUrl !== 'string') return videoUrl;
 
+  if (videoUrl.includes('conformed_hd_')) {
+    console.log(`[videoProcessor] Video is already conformed, skipping re-processing: ${videoUrl}`);
+    return videoUrl;
+  }
+
   try {
     // Strictly cap at 9.5s so Kling's 10.0s check (and float duration rounding) NEVER fails with E006
     const maxDuration = 9.5;

@@ -786,10 +786,20 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
+const activeWebhookProcessing = new Set();
+
 /**
  * Shared logic to process generation webhooks and development-mode queue polling results
  */
 async function handleWebhookLogic(generationId, status, payload, errorMsg) {
+  if (!generationId) return;
+
+  if (activeWebhookProcessing.has(generationId)) {
+    console.log(`[WebhookLogic] Generation ${generationId} is already actively being processed. Skipping concurrent call.`);
+    return;
+  }
+  activeWebhookProcessing.add(generationId);
+
   try {
     const { data: gen } = await supabase
       .from('generations')
@@ -1029,6 +1039,8 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
   } catch (err) {
     console.error(`[WebhookLogic] Exception during webhook execution for ${generationId}:`, err);
     throw err;
+  } finally {
+    activeWebhookProcessing.delete(generationId);
   }
 }
 
@@ -1080,17 +1092,26 @@ router.get('/:id/status', authMiddleware, async (req, res) => {
       try {
         const pred = await replicateService.getPredictionStatus(gen.fal_request_id);
         if (pred && (pred.status === 'succeeded' || pred.status === 'failed' || pred.status === 'canceled')) {
+          // Trigger webhook logic in background WITHOUT blocking the polling HTTP response
+          handleWebhookLogic(
+            gen.id,
+            pred.status === 'succeeded' ? 'OK' : 'ERROR',
+            pred.output,
+            pred.error || 'Prediction finished with failure'
+          ).catch(e => console.warn('[StatusPolling] Background sync notice:', e.message));
+
           if (pred.status === 'succeeded') {
-            await handleWebhookLogic(gen.id, 'OK', pred.output, null);
-          } else {
-            await handleWebhookLogic(gen.id, 'ERROR', null, pred.error || 'Prediction finished with failure');
+            gen.status = 'completed';
+            const mediaUrl = replicateService.extractMediaUrl(pred.output);
+            if (mediaUrl) gen.video_url = mediaUrl;
+          } else if (pred.status === 'failed') {
+            if (gen.generation_type === 'swap' && !gen.error_message?.includes('[swap-fallback-attempted]')) {
+              gen.status = 'processing';
+            } else {
+              gen.status = 'failed';
+              gen.error_message = pred.error || 'Prediction finished with failure';
+            }
           }
-          const { data: refreshed } = await supabase
-            .from('generations')
-            .select('*')
-            .eq('id', gen.id)
-            .single();
-          if (refreshed) gen = refreshed;
         }
       } catch (checkErr) {
         // Silently continue serving current DB record if provider status check is transiently unavailable
