@@ -220,14 +220,14 @@ async function generateCharacterSwapVideo({
   generationId
 }) {
   const resolved = resolveReplicateModel(endpoint, 'kwaivgi/kling-v3-omni-video');
-  const isSeedanceRequested = resolved.includes('seedance');
 
-  // Candidate models in priority order: try preferred first, fallback to alternative if gateway 502/503
-  const candidates = isSeedanceRequested
-    ? ['bytedance/seedance-2.5', 'kwaivgi/kling-v3-omni-video']
-    : ['kwaivgi/kling-v3-omni-video', 'bytedance/seedance-2.5'];
+  // Primary model is kwaivgi/kling-v3-omni-video (verified working engine for V2V Character Swap)
+  const candidates = ['kwaivgi/kling-v3-omni-video'];
+  if (resolved.includes('seedance')) {
+    candidates.push('bytedance/seedance-2.5');
+  }
 
-  // Normalize characters list (supports both new multi-character array and legacy single target_character)
+  // Normalize characters list (supports both multi-character array and legacy single target_character)
   let characterList = Array.isArray(characters) && characters.length > 0 ? [...characters] : [];
   if (characterList.length === 0 && target_character && String(target_character).trim()) {
     characterList = [{ target_image_url: String(target_character).trim(), label: 'main character' }];
@@ -248,14 +248,14 @@ async function generateCharacterSwapVideo({
     allReferenceImages.push(prop_image.trim());
   }
 
-  // Helper to translate Google Flow @tag mentions into model-native syntax
+  // Helper to translate @tag mentions into model-native syntax
   const translatePromptTags = (rawPrompt, isSeedance) => {
     if (!rawPrompt || !rawPrompt.trim()) return '';
     const { sanitizePromptForVideo } = require('./promptSanitizer');
     let p = sanitizePromptForVideo(rawPrompt);
-    p = p.replace(/@Motion\b/gi, isSeedance ? '[Video1]' : '<<<video_1>>>');
+    p = p.replace(/@(Video|Motion)\s*1?\b/gi, isSeedance ? '[Video1]' : '<<<video_1>>>');
     for (let i = 1; i <= 5; i++) {
-      const charRegex = new RegExp(`@Char\\s*${i}\\b`, 'gi');
+      const charRegex = new RegExp(`@(Image|Char)\\s*${i}\\b`, 'gi');
       p = p.replace(charRegex, isSeedance ? `[Image${i}]` : `<<<image_${i}>>>`);
     }
     const propToken = isSeedance ? `[Image${propIndex}]` : `<<<image_${propIndex}>>>`;
@@ -265,66 +265,38 @@ async function generateCharacterSwapVideo({
 
   const buildPayloadForModel = (modelName) => {
     const input = {};
-    if (modelName.includes('seedance')) {
-      const userPromptTranslated = translatePromptTags(prompt, true);
-      const propDirective = hasPropImage ? `, with object [Image${propIndex}]` : '';
+    if (modelName.includes('kling')) {
+      // Kling v3 Omni Director (Verified 28 Sept ground-truth configuration)
+      const userPromptClean = translatePromptTags(prompt, false);
+      const isMotionOnly = userPromptClean.toLowerCase().includes('motion transfer') || userPromptClean.toLowerCase().includes('animate image');
 
       if (hasTargetPhotos) {
-        if (validPhotos.length === 1) {
-          const charLabel = validPhotos[0].label?.trim() ? `the ${validPhotos[0].label}` : 'the main character';
-          input.prompt = userPromptTranslated
-            ? `Replace ${charLabel} in [Video1] with person in [Image1]${propDirective}. ${userPromptTranslated}`
-            : `Replace ${charLabel} in [Video1] with person in [Image1]${propDirective}, seamless motion transfer`;
-        } else {
-          const directives = validPhotos.map((c, i) => {
-            const desc = c.label?.trim() ? `the ${c.label}` : `character ${i + 1}`;
-            return `replace ${desc} in [Video1] with [Image${i + 1}]`;
-          }).join(', and ');
-          input.prompt = `Multi-character replacement in [Video1]: ${directives}${propDirective}. ${userPromptTranslated || 'seamless motion transfer'}`;
-        }
-        input.reference_images = allReferenceImages;
-      } else {
-        input.prompt = userPromptTranslated || 'Seamless motion transfer in [Video1]';
-        if (hasPropImage) {
-          input.reference_images = allReferenceImages;
-        }
-      }
-      if (source_video) input.reference_videos = [source_video];
-      input.resolution = '720p';
-      input.duration = -1; // CRITICAL: Seedance 2.5 editing mode strictly requires -1 (omitting causes E006)
-      input.aspect_ratio = 'adaptive'; // CRITICAL: Seedance 2.5 editing mode strictly requires adaptive (omitting causes E006)
-      input.generate_audio = true;
-    } else {
-      // Kling v3 Omni Director
-      const userPromptTranslated = translatePromptTags(prompt, false);
-      const propDirective = hasPropImage ? `, with object <<<image_${propIndex}>>>` : '';
-
-      if (hasTargetPhotos) {
-        if (validPhotos.length === 1) {
-          const charLabel = validPhotos[0].label?.trim() ? `(${validPhotos[0].label})` : 'main person';
-          input.prompt = userPromptTranslated
-            ? `Replace ${charLabel} in video with <<<image_1>>>${propDirective}. ${userPromptTranslated}`
-            : `Replace ${charLabel} in video with <<<image_1>>>${propDirective}, photorealistic motion transfer`;
-        } else {
-          const directives = validPhotos.map((c, i) => {
-            const desc = c.label?.trim() ? `(${c.label})` : `character ${i + 1}`;
-            return `replace ${desc} in video with <<<image_${i + 1}>>>`;
-          }).join(', and ');
-          input.prompt = `Multi-character replacement in video: ${directives}${propDirective}. ${userPromptTranslated || 'photorealistic motion transfer'}`;
-        }
+        input.prompt = userPromptClean
+          ? `Exact character replacement of <<<video_1>>> with <<<image_1>>>, ${userPromptClean}, preserve original head orientation, precise facial anatomy matching, identical skin tone and facial structure, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic`
+          : 'Exact character replacement of <<<video_1>>> with <<<image_1>>>, preserve original head orientation, precise facial anatomy matching, identical skin tone and facial structure, maintain exact choreography and camera motion of <<<video_1>>>, 8k photorealistic';
         input.reference_images = allReferenceImages.slice(0, 4);
       } else {
-        input.prompt = userPromptTranslated || 'Transform character in video, photorealistic motion transfer';
+        input.prompt = userPromptClean || 'Transform the character in <<<video_1>>>, exact motion transfer, cinematic 8k photorealistic, match original choreography and camera movement';
         if (hasPropImage) {
           input.reference_images = allReferenceImages.slice(0, 4);
         }
       }
       if (source_video) {
         input.reference_video = source_video;
-        input.video_reference_type = 'base';
+        input.video_reference_type = isMotionOnly ? 'feature' : 'base';
         input.keep_original_sound = true;
       }
+      // Note: generate_audio is strictly omitted as it conflicts with reference_video on Kling
       input.mode = (resolution === '1080p') ? 'pro' : 'standard';
+    } else {
+      // Seedance 2.5
+      const userPromptClean = translatePromptTags(prompt, true);
+      input.prompt = userPromptClean || 'Replace person in [Video1] with [Image1], photorealistic motion transfer';
+      if (hasTargetPhotos) input.reference_images = allReferenceImages;
+      if (source_video) input.reference_videos = [source_video];
+      input.resolution = '720p';
+      input.duration = -1;
+      input.aspect_ratio = 'adaptive';
     }
     return input;
   };

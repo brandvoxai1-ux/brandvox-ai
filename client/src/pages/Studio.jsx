@@ -13,6 +13,7 @@ import VideoCard from '../components/shared/VideoCard';
 import CreditDisplay from '../components/shared/CreditDisplay';
 import ImageUploader from '../components/shared/ImageUploader';
 import VideoUploader from '../components/shared/VideoUploader';
+import UnifiedMediaUploader from '../components/shared/UnifiedMediaUploader';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -97,6 +98,39 @@ export default function Studio() {
   const [mobileControlsOpen, setMobileControlsOpen] = useState(false); // Mobile slide-up drawer
   const [propImageUrl, setPropImageUrl] = useState(''); // Optional Object/Prop ingredient
   const [selectedCamera, setSelectedCamera] = useState(null);
+
+  // Higgsfield Unified Media Assets state
+  const [mediaAssets, setMediaAssets] = useState(() => {
+    const list = [];
+    if (location.state?.remixMedia?.video_url) {
+      list.push({
+        id: 'initial_video',
+        type: 'video',
+        tag: '@Video1',
+        url: location.state.remixMedia.video_url,
+        name: 'Source Motion Video'
+      });
+    }
+    return list;
+  });
+
+  const handleMediaAssetsChange = (newAssets) => {
+    setMediaAssets(newAssets);
+    const vid = newAssets.find(a => a.type === 'video');
+    const img = newAssets.find(a => a.type === 'image');
+    setSourceVideoUrl(vid ? vid.url : '');
+    setImageUrl(img ? img.url : '');
+    if (img) {
+      setSwapCharacters([{ id: 'char-1', target_image_url: img.url, label: '' }]);
+    } else {
+      setSwapCharacters([]);
+    }
+    if (vid && img) {
+      setActiveMode('swap');
+    } else if (img && !vid) {
+      setActiveMode('video');
+    }
+  };
 
   const cameraPresets = [
     { id: 'dolly', label: '🎥 Dolly Push', text: 'cinematic slow dolly push-in' },
@@ -829,489 +863,240 @@ export default function Studio() {
       }
     };
     window.addEventListener('keydown', handleShortcuts);
-    return () => window.removeEventListener('keydown', handleShortcuts);
   }, [promptText, selectedModel, duration, resolution, aspectRatio, imageUrl, insufficientCredits]);
 
   const renderControlPanelContent = (isMobile = false) => (
-    <>
-      <div className="space-y-5">
-        {/* Top-level creator mode: Video | Swap (V2V) | Image */}
-        <div className="flex bg-[#0A0B11] p-1 rounded-2xl border border-white/10 text-[10px] font-bold uppercase tracking-wider shadow-sm">
-          {[
-            { id: 'swap', label: 'Character Swap', icon: Users },
-            { id: 'video', label: 'AI Video', icon: Film },
-            { id: 'image', label: 'AI Image', icon: Sparkles }
-          ].map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => { setActiveMode(id); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl transition-all cursor-pointer ${
-                activeMode === id ? 'bg-gradient-purple text-white shadow-glow font-black' : 'text-white/40 hover:text-white/70'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span className="truncate">{label}</span>
-            </button>
-          ))}
+    <div className="space-y-4">
+      {/* 1. HIGGSFIELD UNIFIED MEDIA DROPZONE */}
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest flex items-center justify-between">
+          <span>Media Input</span>
+          <span className="text-[9px] text-white/30 font-normal">Auto-detects 9:16</span>
+        </label>
+        <UnifiedMediaUploader
+          assets={mediaAssets}
+          onChange={handleMediaAssetsChange}
+          onOrientationDetected={(detectedAspect) => {
+            setAspectRatio(detectedAspect);
+            toast.success(`Orientation detected: ${detectedAspect}`, { icon: '📐', duration: 1500 });
+          }}
+        />
+      </div>
+
+      {/* 2. HIGGSFIELD PROMPT BOX WITH @ ELEMENTS & AUDIO */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest">
+            Prompt & Scene Direction
+          </label>
+          <button
+            type="button"
+            disabled={isEnhancing || !promptText.trim()}
+            onClick={handleEnhancePrompt}
+            className="text-[9.5px] font-bold text-yellow-400/90 hover:text-yellow-300 flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Enhance prompt with AI"
+          >
+            <Sparkles className="w-2.5 h-2.5" />
+            <span>{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
+          </button>
         </div>
 
-          {/* MEDIA UPLOAD — Text/Image-to-Video mode */}
-          {activeMode === 'video' && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Media (Optional)</label>
-                {imageUrl && (
-                  <button
-                    onClick={() => {
-                      setImageUrl('');
-                      setMediaDimensions(null);
-                    }}
-                    className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
+        <div className="bg-[#121316] border border-white/12 focus-within:border-yellow-400/60 rounded-2xl p-3 transition-all space-y-2.5 shadow-inner">
+          <textarea
+            ref={promptRef}
+            placeholder="Describe your scene in detail. Use @ to reference assets (e.g. Replace character in @Video1 with @Image1)..."
+            value={promptText}
+            onChange={(e) => setPromptText(e.target.value)}
+            rows={3}
+            className="w-full bg-transparent text-xs text-white placeholder-white/25 resize-none focus:outline-none leading-relaxed"
+          />
 
-              {imageUrl ? (
-                /* Preview of attached image */
-                <div className="relative rounded-xl overflow-hidden border border-white/8 aspect-video bg-black">
-                  <img src={imageUrl} alt="Reference Character" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => {
-                      setImageUrl('');
-                      setMediaDimensions(null);
-                    }}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-error transition-colors cursor-pointer"
-                    title="Remove reference photo"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                  <div className="absolute bottom-1.5 left-1.5 bg-black/60 px-1.5 py-0.5 rounded text-[9px] font-bold text-white/70 uppercase tracking-wider">
-                    Reference Image Active
-                  </div>
-                </div>
-              ) : (
-                /* Upload zone */
-                <div>
-                  <ImageUploader
-                    value={imageUrl}
-                    onUrlReady={(url) => setImageUrl(url)}
-                    onDimensionsDetected={({ ratio }) => {
-                      if (ratio < 0.75 && selectedModel?.supported_aspects?.includes('9:16')) {
-                        setAspectRatio('9:16');
-                      } else if (ratio > 1.35 && selectedModel?.supported_aspects?.includes('16:9')) {
-                        setAspectRatio('16:9');
-                      } else if (selectedModel?.supported_aspects?.includes('1:1')) {
-                        setAspectRatio('1:1');
-                      }
-                    }}
-                    onClear={() => {
-                      setImageUrl('');
-                      setMediaDimensions(null);
-                    }}
-                    compact
-                  />
-                  <p className="text-[8.5px] text-white/35 font-medium leading-tight mt-1">
-                    Optional: Leave empty for text-to-video. If uploaded, AI will use this character or starting frame.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* MOTION & CHARACTER TRANSFER MEDIA SECTION */}
-          {activeMode === 'swap' && (
-            <div className="space-y-4">
-              {/* Step 1: Motion Video */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="w-4 h-4 rounded-full bg-primary/20 text-primary-hover text-[9px] font-black flex items-center justify-center">1</span>
-                    <span>Source Motion Video</span>
-                  </label>
-                  {sourceVideoUrl && (
-                    <button
-                      onClick={() => setSourceVideoUrl('')}
-                      className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <VideoUploader
-                  value={sourceVideoUrl}
-                  onUrlReady={(url, dur) => {
-                    setSourceVideoUrl(url);
-                    if (dur && !isNaN(dur)) {
-                      setDuration(Math.max(3, Math.min(30, Math.round(dur))));
-                    }
-                  }}
-                  onClear={() => setSourceVideoUrl('')}
-                  compact
-                />
-                <p className="text-[8.5px] text-white/40 font-medium leading-tight">
-                  Upload any MP4/MOV video (subject motion will be captured and transferred).
-                </p>
-              </div>
-
-              {/* Step 2: Target Character Face Photo */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center gap-1.5">
-                    <span className="w-4 h-4 rounded-full bg-primary/20 text-primary-hover text-[9px] font-black flex items-center justify-center">2</span>
-                    <span>Target Character Photo</span>
-                  </label>
-                  {swapCharacters.length < 3 && (
-                    <button
-                      type="button"
-                      onClick={handleAddCharacter}
-                      className="flex items-center gap-1 text-[9px] font-extrabold text-primary-hover hover:text-white bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-md border border-primary/20 transition-all cursor-pointer active:scale-95"
-                      title="Add another person to swap in multi-person scenes"
-                    >
-                      <Plus className="w-2.5 h-2.5" />
-                      <span>Add Person</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Character Slots List */}
-                <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-0.5 scrollbar-thin">
-                  {swapCharacters.map((char, index) => (
-                    <div
-                      key={char.id}
-                      className="p-2.5 rounded-xl bg-white/4 border border-white/8 space-y-2 transition-all hover:border-white/15"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-white/85">
-                          {index === 0 ? 'Face / Person Photo' : `Person ${index + 1}`}
-                        </span>
-                        {index > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveCharacter(char.id)}
-                            className="p-1 text-white/40 hover:text-error transition-colors cursor-pointer"
-                            title="Remove person slot"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Photo Uploader */}
-                      <ImageUploader
-                        value={char.target_image_url}
-                        onUrlReady={(url) => handleUpdateCharacter(char.id, 'target_image_url', url)}
-                        onClear={() => handleUpdateCharacter(char.id, 'target_image_url', '')}
-                        compact
-                      />
-
-                      {/* Role in Video (Optional for multi-person scenes) */}
-                      {swapCharacters.length > 1 && (
-                        <div className="space-y-1">
-                          <input
-                            type="text"
-                            placeholder={index === 0 ? "Role: e.g. Center person" : `Role: e.g. Person on right`}
-                            value={char.label}
-                            onChange={(e) => handleUpdateCharacter(char.id, 'label', e.target.value)}
-                            maxLength={60}
-                            className="w-full bg-black/40 border border-white/8 rounded-lg px-2.5 py-1 text-[10px] text-white/85 placeholder-white/25 focus:outline-none focus:border-primary/50 transition-colors"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[8.5px] text-white/40 font-medium leading-tight">
-                  Clear front-facing photo of the person or face you want to appear in the video.
-                </p>
-              </div>
-
-              {/* Likeness Rights & Regulatory Compliance Badge */}
-              <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 space-y-1">
-                <div className="flex items-center gap-1.5 text-primary-hover font-bold text-[9px] uppercase tracking-wider">
-                  <ShieldCheck className="w-3.5 h-3.5 text-primary-hover shrink-0" />
-                  <span>Likeness Consent & Compliance</span>
-                </div>
-                <p className="text-[8.5px] text-white/60 leading-tight">
-                  By submitting motion swaps, you affirm you hold necessary rights or consent from depicted individuals in accordance with our <Link to="/terms" target="_blank" className="text-primary-hover hover:underline font-semibold">Terms of Service</Link>.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* IMAGE REMIX SECTION */}
-          {activeMode === 'image' && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                  Remix Photo <span className="text-white/20 normal-case">(Optional)</span>
-                </label>
-                {remixImageUrl && (
-                  <button
-                    onClick={() => setRemixImageUrl('')}
-                    className="text-[9px] text-error/70 hover:text-error font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <ImageUploader
-                value={remixImageUrl}
-                onUrlReady={(url) => setRemixImageUrl(url)}
-                onClear={() => setRemixImageUrl('')}
-                compact
-              />
-            </div>
-          )}
-
-          {/* MODEL SELECTOR — Available in both Video and Image modes */}
-          <div className="space-y-1.5" ref={modelPickerRef}>
-            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Model</label>
-
-            {/* Trigger row */}
+          {/* Bottom Row Inside Prompt Box */}
+          <div className="flex items-center justify-between pt-1 border-t border-white/6 text-xs">
+            {/* @ Elements Button */}
             <button
-              onClick={() => setModelPickerOpen(o => !o)}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border transition-all cursor-pointer group ${
-                modelPickerOpen
-                  ? 'bg-white/8 border-primary/40 ring-1 ring-primary/20'
-                  : 'bg-white/5 border-white/8 hover:bg-white/8 hover:border-white/15'
-              }`}
+              type="button"
+              onClick={() => {
+                if (mediaAssets.length === 0) {
+                  toast('Upload an image or video above to tag @Elements', { icon: '💡' });
+                  return;
+                }
+                const tags = mediaAssets.map(a => a.tag).join(' and ');
+                if (!promptText.includes(mediaAssets[0].tag)) {
+                  setPromptText(prev => prev ? `${prev} using ${tags}` : `Replace character in ${tags}`);
+                } else {
+                  toast(`Elements ${tags} already tagged in prompt`, { icon: '✓' });
+                }
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-[11px] font-medium transition-colors cursor-pointer border border-white/5"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-md bg-primary/20 text-primary-hover flex items-center justify-center shrink-0">
-                  <Sparkles className="w-3 h-3" />
-                </div>
-                <div className="text-left min-w-0">
-                  <p className="text-[11px] font-bold text-white truncate leading-none">
-                    {selectedModel ? selectedModel.name : 'Select a model'}
-                  </p>
-                  {selectedModel && (
-                    <p className="text-[9px] text-white/40 font-bold mt-0.5 uppercase tracking-wider">
-                      {selectedModel.model_type === 'image'
-                        ? `₹${selectedModel.base_cost} per image`
-                        : `${selectedModel.supported_resolutions?.slice(-1)[0]?.toUpperCase()} · 4s–${Math.max(15, Number(selectedModel.max_duration) || 15)}s`
-                      }
-                    </p>
-                  )}
-                </div>
-              </div>
-              <ChevronRight className={`w-3.5 h-3.5 text-white/30 transition-transform shrink-0 ${
-                modelPickerOpen ? 'rotate-90' : ''
-              }`} />
+              <span className="text-yellow-400 font-bold font-mono">@</span>
+              <span>Elements</span>
             </button>
 
-            {/* Floating dropdown */}
-            {modelPickerOpen && (
-              <div className="absolute left-0 right-0 z-50 mx-2 bg-[#141414] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-                <div className="p-2.5 border-b border-white/5">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/30" />
-                    <input
-                      type="text"
-                      placeholder="Search models..."
-                      value={modelSearch}
-                      onChange={(e) => setModelSearch(e.target.value)}
-                      autoFocus
-                      className="w-full pl-7 pr-3 py-1.5 bg-white/5 border border-white/8 rounded-lg text-[10px] text-white/80 placeholder-white/30 focus:outline-none focus:border-primary/40 transition-colors"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
-                  <Sparkles className="w-2.5 h-2.5 text-primary/50" />
-                  <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">
-                    {activeMode === 'image' ? 'Image Models' : activeMode === 'swap' ? 'Ingredients Motion Models' : 'Video Models'}
-                  </span>
-                </div>
-                <div className="pb-2 max-h-60 overflow-y-auto">
-                  {models
-                    .filter(m => {
-                      if (activeMode === 'image') return m.model_type === 'image';
-                      if (activeMode === 'swap') return m.id === 'kling-3-omni' || m.id === 'seedance-2.5' || m.id === 'seedance-2';
-                      return (m.model_type || 'video') !== 'image';
-                    })
-                    .filter(m => !modelSearch || m.name.toLowerCase().includes(modelSearch.toLowerCase()))
-                    .map((model) => {
-                      const isSelected = selectedModel?.id === model.id;
-                      const topRes = model.supported_resolutions?.slice(-1)[0]?.toUpperCase() || '720P';
-                      return (
-                        <button
-                          key={model.id}
-                          onClick={() => { setSelectedModel(model); setModelSearch(''); setModelPickerOpen(false); }}
-                          className={`w-full flex items-center gap-3 px-3 py-2 transition-colors cursor-pointer ${
-                            isSelected ? 'bg-white/8' : 'hover:bg-white/5'
-                          }`}
-                        >
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                            isSelected ? 'bg-primary/20 text-primary-hover' : 'bg-white/6 text-white/40'
-                          }`}>
-                            <Sparkles className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="flex-1 text-left min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-[11px] font-bold ${isSelected ? 'text-white' : 'text-white/75'}`}>
-                                {model.name}
-                              </span>
-                              {model.badge && (
-                                <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-primary/20 text-primary-hover border border-primary/20 leading-none">
-                                  {model.badge}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              {model.model_type === 'image' ? (
-                                <span className="text-[9px] text-white/35 font-bold">₹{model.base_cost} flat</span>
-                              ) : (
-                                <>
-                                  <span className="text-[9px] text-white/35 font-bold">{topRes}</span>
-                                  <span className="text-white/15 text-[9px]">·</span>
-                                  <span className="text-[9px] text-white/35 font-bold">4s–{Math.max(15, Number(model.max_duration) || 15)}s</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-primary-hover shrink-0" />}
-                        </button>
-                      );
-                    })
-                  }
-                </div>
-              </div>
-            )}
+            {/* Audio Toggle Pill */}
+            <button
+              type="button"
+              onClick={() => setGenerateAudio(!generateAudio)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer border ${
+                generateAudio
+                  ? 'bg-yellow-400/10 border-yellow-400/30 text-yellow-300'
+                  : 'bg-white/5 border-white/5 text-white/40 hover:text-white/60'
+              }`}
+            >
+              {generateAudio ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              <span>Audio</span>
+            </button>
           </div>
-
-          {/* OUTPUT SETTINGS */}
-          <div className="space-y-4 pt-2 border-t border-white/5">
-            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Output settings</label>
-            
-            {/* Resolution dropdown (video + swap) */}
-            {(activeMode === 'video' || activeMode === 'swap') && (
-              <Select
-                label="Resolution"
-                value={resolution}
-                onChange={(e) => setResolution(e.target.value)}
-                options={
-                  selectedModel?.supported_resolutions?.map((r) => ({ value: r, label: r.toUpperCase() })) || [
-                    { value: '720p', label: '720P' }
-                  ]
-                }
-              />
-            )}
-
-            {/* Aspect dropdown (video + swap + image) */}
-            <Select
-              label="Aspect Ratio"
-              value={aspectRatio}
-              onChange={(e) => setAspectRatio(e.target.value)}
-              options={
-                selectedModel?.supported_aspects?.map((a) => ({ value: a, label: a })) || [
-                  { value: '16:9', label: '16:9' }
-                ]
-              }
-            />
-
-            {/* Discrete Duration Selector (video only) */}
-            {activeMode === 'video' && (
-              <div className="flex flex-col space-y-1.5">
-                <div className="flex justify-between text-[10px] font-bold text-white/50 tracking-wider">
-                  <span>Duration</span>
-                  <span className="text-primary-hover font-black">{duration}s</span>
-                </div>
-                <div className="grid grid-cols-6 gap-1 bg-white/5 p-1 rounded-xl border border-white/8">
-                  {((Number(selectedModel?.max_duration) || 15) >= 30 ? [5, 10, 15, 20, 25, 30] : [4, 6, 8, 10, 12, 15]).map((sec) => {
-                    const maxAllowed = Math.max(15, Number(selectedModel?.max_duration) || 15);
-                    const isDisabled = sec > maxAllowed;
-                    return (
-                      <button
-                        key={sec}
-                        type="button"
-                        disabled={isDisabled}
-                        onClick={() => setDuration(sec)}
-                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          duration === sec
-                            ? 'bg-primary text-white shadow-xs'
-                            : 'text-white/60 hover:text-white hover:bg-white/5'
-                        } ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
-                      >
-                        {sec}s
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Natural Video Length Indicator (Character Swap mode) */}
-            {activeMode === 'swap' && (
-              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/8 text-xs">
-                <span className="text-white/60 font-semibold text-[11px]">Output Duration</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Natural ({duration}s from source)
-                </span>
-              </div>
-            )}
-
-            {/* Audio Toggle (video only) */}
-            {activeMode === 'video' && (
-              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/8 transition-all">
-                <div className="flex items-center space-x-2.5">
-                  <div className={`p-1.5 rounded-lg ${generateAudio && selectedModel?.supports_audio ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/30'}`}>
-                    <Volume2 className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold text-white block">Generate Audio</span>
-                    <span className="text-[9px] text-white/40 block">
-                      {selectedModel?.supports_audio ? 'Native cinematic sound & SFX' : 'Silent model (No audio)'}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={!selectedModel?.supports_audio}
-                  onClick={() => setGenerateAudio(!generateAudio)}
-                  className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ease-in-out ${
-                    generateAudio && selectedModel?.supports_audio ? 'bg-primary justify-end' : 'bg-white/20 justify-start'
-                  } ${!selectedModel?.supports_audio ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  title={selectedModel?.supports_audio ? (generateAudio ? 'Sound enabled' : 'Sound disabled') : 'This model does not support audio'}
-                >
-                  <div className="w-4 h-4 bg-white rounded-full shadow-md" />
-                </button>
-              </div>
-            )}
-          </div>
-
-        {/* Dynamic Cost Estimator */}
-        <div className="bg-surface-elevated p-3 rounded-xl border border-white/5 space-y-2">
-          <div className="flex justify-between text-[10px] font-bold text-white/40 uppercase tracking-widest">
-            <span>Estimated Cost</span>
-            <span className={insufficientCredits ? 'text-error font-black' : 'text-primary-hover font-black'}>
-              {formatCredits(cost)}
-            </span>
-          </div>
-          
-          <div className="text-[10px] text-white/35 font-bold uppercase tracking-wider">
-            Balance: <span className="text-white font-extrabold">{formatCredits(profile?.credits || 0)}</span>
-          </div>
-
-          {insufficientCredits && (
-            <p className="text-[9px] font-semibold text-error/80 leading-relaxed pt-1">
-              ⚠️ Insufficient credits. Tap purchase.
-            </p>
-          )}
         </div>
       </div>
+
+      {/* 3. MODEL SELECTOR */}
+      <div className="space-y-1.5 relative" ref={modelPickerRef}>
+        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest block">AI Model</label>
+        <button
+          type="button"
+          onClick={() => setModelPickerOpen(o => !o)}
+          className="w-full flex items-center justify-between px-3 py-2.5 bg-[#121316] hover:bg-[#16171b] border border-white/10 hover:border-white/20 rounded-xl transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-5 h-5 rounded-md bg-yellow-400/10 text-yellow-400 flex items-center justify-center shrink-0">
+              <Sparkles className="w-3 h-3" />
+            </div>
+            <span className="text-xs font-bold text-white truncate">
+              {selectedModel?.name || 'Kling 3.0 Omni Director'}
+            </span>
+          </div>
+          <ChevronRight className={`w-3.5 h-3.5 text-white/40 transition-transform ${modelPickerOpen ? 'rotate-90' : ''}`} />
+        </button>
+
+        {/* Dropdown list */}
+        {modelPickerOpen && (
+          <div className="absolute left-0 right-0 z-50 top-full mt-1 bg-[#16171c] border border-white/12 rounded-xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto">
+            {models.map(model => (
+              <button
+                key={model.id}
+                type="button"
+                onClick={() => { setSelectedModel(model); setModelPickerOpen(false); }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-left text-xs transition-colors cursor-pointer ${
+                  selectedModel?.id === model.id ? 'bg-yellow-400/10 text-yellow-300 font-bold' : 'hover:bg-white/5 text-white/80'
+                }`}
+              >
+                <div className="truncate">
+                  <p className="truncate font-medium">{model.name}</p>
+                  <p className="text-[9px] text-white/40 uppercase">{model.supported_resolutions?.slice(-1)[0] || '720P'}</p>
+                </div>
+                {selectedModel?.id === model.id && <Check className="w-3.5 h-3.5 text-yellow-400 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 4. 3 AUTO PILLS (Duration • Aspect Ratio • Resolution) */}
+      <div className="space-y-1.5">
+        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest block">Output Format</label>
+        <div className="grid grid-cols-3 gap-1.5">
+          {/* Duration Pill */}
+          <button
+            type="button"
+            onClick={() => {
+              const options = [5, 8, 10];
+              const next = options[(options.indexOf(duration) + 1) % options.length] || 5;
+              setDuration(next);
+            }}
+            className="flex items-center justify-center gap-1 py-2 px-1 rounded-xl bg-[#121316] border border-white/10 hover:border-white/20 text-xs font-semibold text-white/80 transition-colors cursor-pointer"
+            title="Click to cycle duration: 5s, 8s, 10s"
+          >
+            <Clock className="w-3 h-3 text-white/40" />
+            <span>{duration}s</span>
+          </button>
+
+          {/* Aspect Ratio Pill */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = aspectRatio === '9:16' ? '16:9' : '9:16';
+              setAspectRatio(next);
+              toast.success(`Aspect ratio: ${next}`, { icon: '📐', duration: 1200 });
+            }}
+            className="flex items-center justify-center gap-1 py-2 px-1 rounded-xl bg-[#121316] border border-white/10 hover:border-white/20 text-xs font-semibold text-white/80 transition-colors cursor-pointer"
+            title="Click to toggle 9:16 vertical (Reels) vs 16:9 landscape"
+          >
+            <span className="text-[10px] text-white/40">▯</span>
+            <span>{aspectRatio}</span>
+          </button>
+
+          {/* Resolution Pill */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = resolution === '720p' ? '1080p' : '720p';
+              setResolution(next);
+            }}
+            className="flex items-center justify-center gap-1 py-2 px-1 rounded-xl bg-[#121316] border border-white/10 hover:border-white/20 text-xs font-semibold text-white/80 transition-colors cursor-pointer"
+            title="Click to toggle 720p / 1080p"
+          >
+            <span className="text-[10px] text-white/40">👁️</span>
+            <span>{resolution.toUpperCase()}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 5. COST & BALANCE */}
+      <div className="flex items-center justify-between px-3 py-2 bg-[#121316] rounded-xl border border-white/6 text-xs">
+        <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider">Estimated Cost</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-white/90">₹{cost.toFixed(1)}</span>
+          <span className="text-white/20">|</span>
+          <span className="text-[10px] text-white/50">Bal: ₹{(profile?.credits || 0).toFixed(1)}</span>
+        </div>
+      </div>
+
+      {/* 6. NEON GENERATE CTA BUTTON */}
+      <button
+        type="button"
+        disabled={
+          (generationStatus !== 'idle' && generationStatus !== 'completed' && generationStatus !== 'failed') ||
+          imageGenerating ||
+          insufficientCredits
+        }
+        onClick={handleGenerate}
+        className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg active:scale-98 ${
+          insufficientCredits
+            ? 'bg-red-500/20 text-red-400 border border-red-500/30 cursor-not-allowed'
+            : (generationStatus === 'pending' || generationStatus === 'processing' || imageGenerating)
+            ? 'bg-yellow-400/40 text-black cursor-wait'
+            : 'bg-[#E8FF3B] text-black hover:bg-[#d6f028] shadow-[#E8FF3B]/20 hover:shadow-[#E8FF3B]/30'
+        }`}
+      >
+        {(generationStatus === 'pending' || generationStatus === 'processing' || imageGenerating) ? (
+          <>
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            <span>Generating...</span>
+          </>
+        ) : insufficientCredits ? (
+          <span>Insufficient Balance (₹{(profile?.credits || 0).toFixed(0)})</span>
+        ) : (
+          <>
+            <span>Generate</span>
+            <Sparkles className="w-3.5 h-3.5 fill-black" />
+            <span className="bg-black/15 px-2 py-0.5 rounded-full text-[10px] font-black">₹{cost.toFixed(0)}</span>
+          </>
+        )}
+      </button>
+
       {isMobile && (
         <Button
-          variant="primary"
-          size="md"
-          className="w-full mt-4 py-2.5 font-bold uppercase text-xs tracking-wider"
+          variant="secondary"
+          size="sm"
+          className="w-full mt-2 py-2 font-bold uppercase text-[10px] tracking-wider"
           onClick={() => setMobileControlsOpen(false)}
         >
-          Done & View Canvas
+          View Video Canvas
         </Button>
       )}
-    </>
+    </div>
   );
 
   return (
@@ -1344,8 +1129,8 @@ export default function Studio() {
         </>
       )}
 
-      {/* PANEL 2: DESKTOP LEFT CONTROL PANEL (220px wide) */}
-      <aside className="hidden lg:flex flex-col w-56 bg-surface border-r border-white/5 p-4 overflow-y-auto shrink-0 select-none justify-between space-y-6 relative">
+      {/* PANEL 2: DESKTOP LEFT CONTROL PANEL (320px wide - Higgsfield Style) */}
+      <aside className="hidden lg:flex flex-col w-[320px] bg-[#0c0d10] border-r border-white/8 p-3.5 overflow-y-auto shrink-0 select-none space-y-4 relative scrollbar-thin">
         {renderControlPanelContent(false)}
       </aside>
 
@@ -1685,8 +1470,8 @@ export default function Studio() {
           </div>
         </div>
 
-        {/* Prompt input tray & Fixed Thumb Dock (Pinned at bottom on mobile, natural flow on desktop) */}
-        <div className="shrink-0 w-full px-2 pb-2 sm:px-6 sm:pb-4 max-w-2xl mx-auto z-20">
+        {/* Prompt input tray & Fixed Thumb Dock (Pinned at bottom on mobile, hidden on desktop where sidebar contains Higgsfield controls) */}
+        <div className="lg:hidden shrink-0 w-full px-2 pb-2 sm:px-6 sm:pb-4 max-w-2xl mx-auto z-20">
           <div className="w-full bg-surface border border-white/8 p-2.5 sm:p-4 rounded-xl sm:rounded-2xl select-none shadow-premium space-y-2 sm:space-y-3">
             
             {/* DESKTOP TOOLBARS (visible on sm: and above) */}

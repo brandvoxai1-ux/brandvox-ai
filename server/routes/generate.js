@@ -11,6 +11,7 @@ const { archiveVideo, archiveImage } = require('../services/storageService');
 const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
 const { enhanceAdPrompt, STYLE_PRESETS } = require('../services/promptEnhancer');
 const { validatePromptSafety } = require('../lib/moderation');
+const memoryCache = require('../lib/cache');
 
 /**
  * POST /api/generate
@@ -527,49 +528,18 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
       resolution: '720p',
       aspect_ratio: aspect_ratio || '16:9',
       cost: estimatedCost,
-      generation_type: 'swap',
-      source_video_url,
-      input_image_url: primaryCharacterUrl,
-      characters: normalizedCharacters,
+      generation_type: 'video', // Strictly satisfies PostgreSQL CHECK (generation_type IN ('video', 'image'))
       is_public: false
     };
 
-    let { data: generation, error: dbErr } = await supabase
+    const { data: generation, error: dbErr } = await supabase
       .from('generations')
       .insert(insertPayload)
       .select()
       .single();
 
-    if (dbErr && (dbErr.message.includes('characters') || dbErr.message.includes('schema cache') || dbErr.message.includes('column'))) {
-      console.warn('[CharacterSwap] characters column not in schema cache, retrying:', dbErr.message);
-      delete insertPayload.characters;
-      const retryResult = await supabase
-        .from('generations')
-        .insert(insertPayload)
-        .select()
-        .single();
-      generation = retryResult.data;
-      dbErr = retryResult.error;
-    }
-
-    if (dbErr) {
-      console.warn('[CharacterSwap] Primary insert failed, applying resilient fallback:', dbErr.message);
-      const retryPayload = { ...insertPayload };
-      delete retryPayload.source_video_url;
-      delete retryPayload.input_image_url;
-      delete retryPayload.characters;
-
-      let retry = await supabase.from('generations').insert(retryPayload).select().single();
-      if (retry.error && retry.error.message.includes('generations_generation_type_check')) {
-        console.warn('[CharacterSwap] Constraint requires video type fallback:', retry.error.message);
-        retryPayload.generation_type = 'video';
-        retry = await supabase.from('generations').insert(retryPayload).select().single();
-      }
-      generation = retry.data;
-      dbErr = retry.error;
-    }
-
     if (dbErr || !generation) {
+      console.error('[CharacterSwap] Insert failed:', dbErr);
       throw new Error(`Failed to initialize character swap generation: ${dbErr?.message}`);
     }
 
@@ -580,6 +550,14 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
       `Character Replacement Video: ${model.name} (${selectedDuration}s)`,
       generation.id
     );
+
+    // Cache swap assets in memory with 2-hour TTL for failover resilience
+    memoryCache.set(`swap_assets_${generation.id}`, {
+      source_video_url,
+      primaryCharacterUrl,
+      normalizedCharacters,
+      prop_image_url
+    }, 7200);
 
     // 5. Send early response to client
     res.status(202).json({
@@ -954,10 +932,16 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
           const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
           const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
 
-          let videoUrlToUse = gen.source_video_url;
+          const cachedAssets = memoryCache.get(`swap_assets_${generationId}`) || {};
+          let videoUrlToUse = cachedAssets.source_video_url || gen.source_video_url;
+          const targetCharToUse = cachedAssets.primaryCharacterUrl || gen.input_image_url;
+          const charactersToUse = (cachedAssets.normalizedCharacters && cachedAssets.normalizedCharacters.length > 0)
+            ? cachedAssets.normalizedCharacters
+            : (gen.characters || []);
+
           try {
             const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
-            videoUrlToUse = await ensureCompatibleReferenceVideoUrl(gen.source_video_url, gen.user_id, supabase, fallbackTarget);
+            videoUrlToUse = await ensureCompatibleReferenceVideoUrl(videoUrlToUse, gen.user_id, supabase, fallbackTarget);
           } catch (vpErr) {
             console.warn('[WebhookLogic] Conformance check skipped:', vpErr.message);
           }
@@ -965,8 +949,9 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
           const fallbackResult = await replicateService.generateCharacterSwapVideo({
             endpoint: fallbackTarget,
             source_video: videoUrlToUse,
-            target_character: gen.input_image_url,
-            characters: gen.characters || [],
+            target_character: targetCharToUse,
+            characters: charactersToUse,
+            prop_image: cachedAssets.prop_image_url,
             prompt: gen.prompt,
             aspect_ratio: gen.aspect_ratio || '16:9',
             resolution: gen.resolution || '720p',

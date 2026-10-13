@@ -109,18 +109,16 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
 
     if (needsUpscale) {
       const scale = Math.max(720 / width, 720 / height);
-      // Dimensions must be even numbers for H.264
-      targetW = Math.round((width * scale) / 2) * 2;
-      targetH = Math.round((height * scale) / 2) * 2;
+      // Dimensions must be multiples of 16 for H.264 / AI VAE tensor compatibility
+      targetW = Math.round((width * scale) / 16) * 16;
+      targetH = Math.round((height * scale) / 16) * 16;
       if (targetW < 720) targetW = 720;
       if (targetH < 720) targetH = 720;
-      targetW = Math.ceil(targetW / 2) * 2;
-      targetH = Math.ceil(targetH / 2) * 2;
       console.log(`[videoProcessor] Upscaling video from ${width}x${height} to ${targetW}x${targetH} (HD quality)`);
     } else {
-      // Ensure dimensions are even numbers for H.264
-      targetW = Math.round(targetW / 2) * 2;
-      targetH = Math.round(targetH / 2) * 2;
+      // Ensure dimensions are divisible by 16 for H.264
+      targetW = Math.round(targetW / 16) * 16;
+      targetH = Math.round(targetH / 16) * 16;
     }
 
     // Build FFmpeg command with high quality bicubic scaling, square pixel PAR (1:1), and audio stream mapping
@@ -175,21 +173,11 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, tar
     return videoUrl;
   }
 
-  const modelLower = String(targetModelId || '').toLowerCase();
-  const isSeedance = modelLower.includes('seedance');
-
-  // Seedance 2.5 natively supports reference videos up to 30s with adaptive geometry!
-  // It handles the natural duration of the video directly without any artificial trimming.
-  if (isSeedance) {
-    console.log(`[videoProcessor] Target model is Seedance 2.5 (supports natural duration up to 30s). Passing original video URL untouched: ${videoUrl}`);
-    return videoUrl;
-  }
-
+  // All reference videos pass through universal conforming to ensure HD geometry (>=720px) and clean limits
   try {
-    // For Kling: only trim if video genuinely exceeds Kling's 10s ceiling
-    const maxDuration = 9.5;
+    const maxDuration = 10.0; // Kling 3.0 Omni maximum ceiling
 
-    console.log(`[videoProcessor] Checking compatibility for Kling reference video: ${videoUrl} (model: ${targetModelId || 'generic'})`);
+    console.log(`[videoProcessor] Checking compatibility for reference video: ${videoUrl} (target model: ${targetModelId || 'generic'})`);
     
     // Download video with generous 35s timeout
     const response = await axios.get(videoUrl, {
