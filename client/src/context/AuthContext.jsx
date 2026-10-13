@@ -67,8 +67,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!user?.id) return;
 
+    let isSubscribed = true;
+    const channelId = `profile-rt-${user.id}-${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel(`profile-realtime-${user.id}`)
+      .channel(channelId)
       .on(
         'postgres_changes',
         {
@@ -78,7 +80,7 @@ export const AuthProvider = ({ children }) => {
           filter: `id=eq.${user.id}`
         },
         (payload) => {
-          if (payload.new) {
+          if (isSubscribed && payload.new) {
             setProfile((prev) => (prev ? { ...prev, ...payload.new } : payload.new));
           }
         }
@@ -86,7 +88,10 @@ export const AuthProvider = ({ children }) => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      isSubscribed = false;
+      try {
+        supabase.removeChannel(channel);
+      } catch (_) {}
     };
   }, [user?.id]);
 

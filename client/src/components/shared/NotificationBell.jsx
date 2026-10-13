@@ -49,8 +49,9 @@ export default function NotificationBell({ onOpenDrawer = null }) {
     // Subscribe to realtime database changes for notifications
     if (!profile?.id) return;
     
+    const channelId = `bell-notif-${profile.id}-${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel('bell-notifications')
+      .channel(channelId)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
@@ -69,7 +70,9 @@ export default function NotificationBell({ onOpenDrawer = null }) {
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
-      supabase.removeChannel(channel);
+      try {
+        supabase.removeChannel(channel);
+      } catch (_) {}
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [profile?.id]);

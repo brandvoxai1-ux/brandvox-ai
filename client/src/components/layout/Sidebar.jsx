@@ -47,8 +47,9 @@ export default function Sidebar({ toggleNotifications }) {
     fetchNotificationsCount();
     
     // Subscribe to realtime updates for notifications
+    const channelId = `sidebar-notif-${profile.id}-${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel('schema-notifications')
+      .channel(channelId)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` },
@@ -59,7 +60,9 @@ export default function Sidebar({ toggleNotifications }) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      try {
+        supabase.removeChannel(channel);
+      } catch (_) {}
     };
   }, [profile?.id]);
 
