@@ -482,10 +482,14 @@ export default function Studio() {
       if (!selectedModel.supported_resolutions?.includes(resolution)) {
         setResolution(selectedModel.supported_resolutions?.[0] || '720p');
       }
-      // Adjust duration limit (support up to 30s for models like Seedance 2.5)
-      const maxAllowed = Math.max(30, Number(selectedModel.max_duration) || 30);
-      if (duration > maxAllowed) {
-        setDuration(maxAllowed);
+      // Adjust duration limit to match the active model's true ceiling
+      if (selectedModel.id === 'minimax-hailuo') {
+        setDuration(6);
+      } else {
+        const modelMax = Number(selectedModel.max_duration) || 10;
+        if (modelMax > 0 && duration > modelMax) {
+          setDuration(modelMax);
+        }
       }
     }
   }, [selectedModel]);
@@ -892,6 +896,17 @@ export default function Studio() {
           onOrientationDetected={(detectedAspect) => {
             setAspectRatio(detectedAspect);
             toast.success(`Orientation detected: ${detectedAspect}`, { icon: '📐', duration: 1500 });
+          }}
+          onDurationDetected={(detectedDur) => {
+            const rawDur = Math.round(detectedDur);
+            const modelMax = Number(selectedModel?.max_duration) || 10;
+            const clamped = Math.max(3, Math.min(modelMax, rawDur));
+            setDuration(clamped);
+            if (rawDur > modelMax) {
+              toast(`Video is ${rawDur}s: trimmed to ${modelMax}s (${selectedModel?.name || 'AI'} tensor limit)`, { icon: '⏱️', duration: 3500 });
+            } else {
+              toast(`Detected video length: ${clamped}s`, { icon: '⏱️', duration: 2000 });
+            }
           }}
         />
       </div>

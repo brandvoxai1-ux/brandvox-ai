@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
  * Higgsfield-style single media dropzone accepting Images, Videos, and Audios.
  * Automatically tags assets as @Video1, @Image1, @Audio1 and detects orientation.
  */
-export default function UnifiedMediaUploader({ assets = [], onChange, onOrientationDetected }) {
+export default function UnifiedMediaUploader({ assets = [], onChange, onOrientationDetected, onDurationDetected }) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -73,6 +73,9 @@ export default function UnifiedMediaUploader({ assets = [], onChange, onOrientat
                 onOrientationDetected('9:16');
               } else if (meta.width >= meta.height && onOrientationDetected) {
                 onOrientationDetected('16:9');
+              }
+              if (meta.duration && onDurationDetected) {
+                onDurationDetected(meta.duration);
               }
             }
           } catch (_) {}

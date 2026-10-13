@@ -67,9 +67,9 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
       return res.status(400).json({ error: 'An input image URL is required for Image-to-Video animation.' });
     }
 
-    const maxAllowedDuration = Math.max(15, parseInt(model.max_duration || 15));
+    const maxAllowedDuration = parseInt(model.max_duration, 10) || 10;
     if (selectedDuration > maxAllowedDuration) {
-      return res.status(400).json({ error: `Selected duration exceeds model maximum of ${maxAllowedDuration} seconds.` });
+      return res.status(400).json({ error: `Selected duration exceeds ${model.name} maximum of ${maxAllowedDuration} seconds.` });
     }
 
     // Cost = duration * price_per_second
@@ -471,7 +471,7 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
     }
   }
 
-  const selectedDuration = parseInt(duration) || 10;
+  const selectedDuration = Math.max(3, Math.min(10, parseInt(duration) || 10));
   const targetModelId = model_id || 'kling-3-omni';
 
   try {
