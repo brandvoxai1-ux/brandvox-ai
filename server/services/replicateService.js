@@ -220,13 +220,12 @@ async function generateCharacterSwapVideo({
   generationId
 }) {
   const resolved = resolveReplicateModel(endpoint, 'kwaivgi/kling-v3-omni-video');
-  
-  // Guarantee character swap uses a true V2V motion transfer model
-  const model = resolved.includes('seedance')
-    ? (resolved.includes('2.5') ? 'bytedance/seedance-2.5' : 'bytedance/seedance-2.0')
-    : 'kwaivgi/kling-v3-omni-video';
+  const isSeedanceRequested = resolved.includes('seedance');
 
-  const input = {};
+  // Candidate models in priority order: try preferred first, fallback to alternative if gateway 502/503
+  const candidates = isSeedanceRequested
+    ? ['bytedance/seedance-2.5', 'kwaivgi/kling-v3-omni-video']
+    : ['kwaivgi/kling-v3-omni-video', 'bytedance/seedance-2.5'];
 
   // Normalize characters list (supports both new multi-character array and legacy single target_character)
   let characterList = Array.isArray(characters) && characters.length > 0 ? [...characters] : [];
@@ -254,86 +253,86 @@ async function generateCharacterSwapVideo({
     if (!rawPrompt || !rawPrompt.trim()) return '';
     const { sanitizePromptForVideo } = require('./promptSanitizer');
     let p = sanitizePromptForVideo(rawPrompt);
-    // Replace @Motion
     p = p.replace(/@Motion\b/gi, isSeedance ? '[Video1]' : '<<<video_1>>>');
-    // Replace @Char 1..5 or @Char1..5
     for (let i = 1; i <= 5; i++) {
       const charRegex = new RegExp(`@Char\\s*${i}\\b`, 'gi');
       p = p.replace(charRegex, isSeedance ? `[Image${i}]` : `<<<image_${i}>>>`);
     }
-    // Replace @Prop or @Object
     const propToken = isSeedance ? `[Image${propIndex}]` : `<<<image_${propIndex}>>>`;
     p = p.replace(/@(Prop|Object)\b/gi, propToken);
     return p;
   };
 
-  if (model.includes('seedance')) {
-    const userPromptTranslated = translatePromptTags(prompt, true);
-    const propDirective = hasPropImage ? `, with object [Image${propIndex}]` : '';
+  const buildPayloadForModel = (modelName) => {
+    const input = {};
+    if (modelName.includes('seedance')) {
+      const userPromptTranslated = translatePromptTags(prompt, true);
+      const propDirective = hasPropImage ? `, with object [Image${propIndex}]` : '';
 
-    if (hasTargetPhotos) {
-      if (validPhotos.length === 1) {
-        const charLabel = validPhotos[0].label?.trim() ? `the ${validPhotos[0].label}` : 'the main character';
-        input.prompt = userPromptTranslated
-          ? `Replace ${charLabel} in [Video1] with person in [Image1]${propDirective}. ${userPromptTranslated}`
-          : `Replace ${charLabel} in [Video1] with person in [Image1]${propDirective}, seamless motion transfer`;
-      } else {
-        const directives = validPhotos.map((c, i) => {
-          const desc = c.label?.trim() ? `the ${c.label}` : `character ${i + 1}`;
-          return `replace ${desc} in [Video1] with [Image${i + 1}]`;
-        }).join(', and ');
-        input.prompt = `Multi-character replacement in [Video1]: ${directives}${propDirective}. ${userPromptTranslated || 'seamless motion transfer'}`;
-      }
-      input.reference_images = allReferenceImages;
-    } else {
-      input.prompt = userPromptTranslated || 'Seamless motion transfer in [Video1]';
-      if (hasPropImage) {
+      if (hasTargetPhotos) {
+        if (validPhotos.length === 1) {
+          const charLabel = validPhotos[0].label?.trim() ? `the ${validPhotos[0].label}` : 'the main character';
+          input.prompt = userPromptTranslated
+            ? `Replace ${charLabel} in [Video1] with person in [Image1]${propDirective}. ${userPromptTranslated}`
+            : `Replace ${charLabel} in [Video1] with person in [Image1]${propDirective}, seamless motion transfer`;
+        } else {
+          const directives = validPhotos.map((c, i) => {
+            const desc = c.label?.trim() ? `the ${c.label}` : `character ${i + 1}`;
+            return `replace ${desc} in [Video1] with [Image${i + 1}]`;
+          }).join(', and ');
+          input.prompt = `Multi-character replacement in [Video1]: ${directives}${propDirective}. ${userPromptTranslated || 'seamless motion transfer'}`;
+        }
         input.reference_images = allReferenceImages;
-      }
-    }
-    if (source_video) input.reference_videos = [source_video];
-    input.resolution = '720p';
-    input.generate_audio = true;
-  } else {
-    // Kling v3 Omni Director
-    const userPromptTranslated = translatePromptTags(prompt, false);
-    const propDirective = hasPropImage ? `, with object <<<image_${propIndex}>>>` : '';
-
-    if (hasTargetPhotos) {
-      if (validPhotos.length === 1) {
-        const charLabel = validPhotos[0].label?.trim() ? `(${validPhotos[0].label})` : 'main person';
-        input.prompt = userPromptTranslated
-          ? `Replace ${charLabel} in video with <<<image_1>>>${propDirective}. ${userPromptTranslated}`
-          : `Replace ${charLabel} in video with <<<image_1>>>${propDirective}, photorealistic motion transfer`;
       } else {
-        const directives = validPhotos.map((c, i) => {
-          const desc = c.label?.trim() ? `(${c.label})` : `character ${i + 1}`;
-          return `replace ${desc} in video with <<<image_${i + 1}>>>`;
-        }).join(', and ');
-        input.prompt = `Multi-character replacement in video: ${directives}${propDirective}. ${userPromptTranslated || 'photorealistic motion transfer'}`;
+        input.prompt = userPromptTranslated || 'Seamless motion transfer in [Video1]';
+        if (hasPropImage) {
+          input.reference_images = allReferenceImages;
+        }
       }
-      input.reference_images = allReferenceImages;
+      if (source_video) input.reference_videos = [source_video];
+      input.resolution = '720p';
+      input.generate_audio = true;
     } else {
-      input.prompt = userPromptTranslated || 'Transform character in video, photorealistic motion transfer';
-      if (hasPropImage) {
+      // Kling v3 Omni Director
+      const userPromptTranslated = translatePromptTags(prompt, false);
+      const propDirective = hasPropImage ? `, with object <<<image_${propIndex}>>>` : '';
+
+      if (hasTargetPhotos) {
+        if (validPhotos.length === 1) {
+          const charLabel = validPhotos[0].label?.trim() ? `(${validPhotos[0].label})` : 'main person';
+          input.prompt = userPromptTranslated
+            ? `Replace ${charLabel} in video with <<<image_1>>>${propDirective}. ${userPromptTranslated}`
+            : `Replace ${charLabel} in video with <<<image_1>>>${propDirective}, photorealistic motion transfer`;
+        } else {
+          const directives = validPhotos.map((c, i) => {
+            const desc = c.label?.trim() ? `(${c.label})` : `character ${i + 1}`;
+            return `replace ${desc} in video with <<<image_${i + 1}>>>`;
+          }).join(', and ');
+          input.prompt = `Multi-character replacement in video: ${directives}${propDirective}. ${userPromptTranslated || 'photorealistic motion transfer'}`;
+        }
         input.reference_images = allReferenceImages;
+      } else {
+        input.prompt = userPromptTranslated || 'Transform character in video, photorealistic motion transfer';
+        if (hasPropImage) {
+          input.reference_images = allReferenceImages;
+        }
       }
+      if (source_video) {
+        input.reference_video = source_video;
+        input.video_reference_type = 'base';
+        input.keep_original_sound = true;
+      }
+      input.mode = (resolution === '1080p') ? 'pro' : 'standard';
     }
-    if (source_video) {
-      input.reference_video = source_video;
-      input.video_reference_type = 'base';
-      input.keep_original_sound = true;
-    }
-    input.mode = (resolution === '1080p') ? 'pro' : 'standard';
-  }
+    return input;
+  };
 
-  try {
-    console.log(`[replicateService] Generating Character Swap V2V video via Replicate: ${model}`);
-    console.log(`[replicateService] Source Video: ${source_video}`);
-    console.log(`[replicateService] Target Characters (${validPhotos.length}):`, validPhotos.map(p => p.label || p.target_image_url));
+  let lastError = null;
 
+  for (const modelToTry of candidates) {
+    const input = buildPayloadForModel(modelToTry);
     const predictionPayload = {
-      model,
+      model: modelToTry,
       input
     };
 
@@ -342,13 +341,36 @@ async function generateCharacterSwapVideo({
       predictionPayload.webhook_events_filter = ['completed'];
     }
 
-    const prediction = await replicate.predictions.create(predictionPayload);
-    console.log(`[replicateService] Created V2V prediction queue ID: ${prediction.id}`);
-    return { request_id: prediction.id };
-  } catch (error) {
-    console.error('[replicateService] Character swap video generation failed:', error);
-    throw new Error(error.message || 'Character replacement API request failed');
+    // Try up to 2 attempts per model (handles transient 502 Cloudflare glitches)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log(`[replicateService] Character Swap attempt ${attempt} on: ${modelToTry}`);
+        console.log(`[replicateService] Source Video: ${source_video}`);
+        console.log(`[replicateService] Target Characters (${validPhotos.length}):`, validPhotos.map(p => p.label || p.target_image_url));
+
+        const prediction = await replicate.predictions.create(predictionPayload);
+        console.log(`[replicateService] Created V2V prediction queue ID on ${modelToTry}: ${prediction.id}`);
+        return { request_id: prediction.id, model_used: modelToTry };
+      } catch (error) {
+        lastError = error;
+        const errMsg = String(error.message || '');
+        const isTransientGateway = error.status === 502 || error.status === 503 || error.status === 504 || 
+          errMsg.includes('502') || errMsg.includes('Bad Gateway') || errMsg.includes('503');
+
+        console.warn(`[replicateService] Model ${modelToTry} attempt ${attempt} failed: ${errMsg}`);
+
+        if (isTransientGateway && attempt === 1) {
+          console.log('[replicateService] Gateway 502 encountered, backing off 1.5s before retry...');
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+        break; // Move to next candidate model in fallback list
+      }
+    }
   }
+
+  console.error('[replicateService] All character swap candidates exhausted. Last error:', lastError);
+  throw new Error(lastError?.message || 'Character replacement API request failed after retry');
 }
 
 /**

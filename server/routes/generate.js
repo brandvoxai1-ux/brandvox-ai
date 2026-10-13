@@ -629,10 +629,11 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
         });
 
         if (result.request_id) {
-          // Store prediction ID in DB to track it
+          const updatePayload = { fal_request_id: result.request_id };
+          if (result.model_used) updatePayload.model_name = result.model_used;
           await supabase
             .from('generations')
-            .update({ fal_request_id: result.request_id })
+            .update(updatePayload)
             .eq('id', generation.id);
 
           // Background prediction tracking (runs on both localhost and production as webhook fallback)
