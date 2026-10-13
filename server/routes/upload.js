@@ -99,28 +99,11 @@ router.post('/video', authMiddleware, videoUpload.single('file'), async (req, re
     const ext = origExt || mimeExt || 'mp4';
     const filename = `${req.user.id}/source_${Date.now()}.${ext}`;
 
-    const { processReferenceVideoBuffer } = require('../services/videoProcessor');
-    let bufferToUpload = req.file.buffer;
-
-    try {
-      // Proactively conform source video at upload time:
-      // - Max duration capped at 9.5s (eliminates Kling E006 >10s error at the root)
-      // - Scale to >= 720px for HD consistency
-      // - Standardize to square pixels (SAR 1:1)
-      const conformed = await processReferenceVideoBuffer(req.file.buffer, req.file.mimetype, { maxDuration: 9.5 });
-      if (conformed && conformed.processed) {
-        bufferToUpload = conformed.buffer;
-        console.log(`[UploadService] Auto-conformed source video before storage upload: ${bufferToUpload.length} bytes (was ${req.file.buffer.length})`);
-      }
-    } catch (procErr) {
-      console.warn('[UploadService] Video pre-conformance warning, using raw buffer:', procErr.message);
-    }
-
-    console.log(`[UploadService] Uploading to storage: ${filename} (${bufferToUpload.length} bytes)`);
+    console.log(`[UploadService] Uploading original source video to storage: ${filename} (${req.file.size} bytes)`);
 
     const { data, error } = await supabase.storage
       .from('uploads')
-      .upload(filename, bufferToUpload, {
+      .upload(filename, req.file.buffer, {
         contentType: req.file.mimetype || 'video/mp4',
         upsert: true
       });

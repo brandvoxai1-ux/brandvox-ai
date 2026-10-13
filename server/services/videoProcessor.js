@@ -85,19 +85,7 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
     const info = await probeVideo(inputPath);
 
     if (!info || !info.width || !info.height) {
-      console.warn('[videoProcessor] Could not probe video metadata; executing safe HD & duration conform...');
-      try {
-        const durationLimit = maxDuration ? `-t ${maxDuration}` : '-t 9.5';
-        const fallbackCmd = `"${ffmpegPath}" -y -i "${inputPath}" ${durationLimit} -vf "scale='if(lt(iw,720),720,iw)':-2,setsar=1" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
-        await execWithTimeout(fallbackCmd, 35000);
-        if (fs.existsSync(outputPath)) {
-          const outputBuffer = fs.readFileSync(outputPath);
-          console.log(`[videoProcessor] Fallback conform succeeded: ${outputBuffer.length} bytes`);
-          return { buffer: outputBuffer, processed: true };
-        }
-      } catch (safeErr) {
-        console.warn('[videoProcessor] Fallback conform failed:', safeErr.message);
-      }
+      console.warn('[videoProcessor] Could not probe video metadata; passing original buffer without modifications.');
       return { buffer: inputBuffer, processed: false };
     }
 
@@ -107,7 +95,7 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
 
     const needsUpscale = width < 720 || height < 720;
     const needsLoop = duration < 2.0;
-    const needsDurationCap = maxDuration && duration > maxDuration;
+    const needsDurationCap = maxDuration && duration > 10.0;
     const needsSarFix = isNonSquareSar;
 
     if (!needsUpscale && !needsLoop && !needsDurationCap && !needsSarFix) {
@@ -187,11 +175,21 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, tar
     return videoUrl;
   }
 
+  const modelLower = String(targetModelId || '').toLowerCase();
+  const isSeedance = modelLower.includes('seedance');
+
+  // Seedance 2.5 natively supports reference videos up to 30s with adaptive geometry!
+  // It handles the natural duration of the video directly without any artificial trimming.
+  if (isSeedance) {
+    console.log(`[videoProcessor] Target model is Seedance 2.5 (supports natural duration up to 30s). Passing original video URL untouched: ${videoUrl}`);
+    return videoUrl;
+  }
+
   try {
-    // Strictly cap at 9.5s so Kling's 10.0s check (and float duration rounding) NEVER fails with E006
+    // For Kling: only trim if video genuinely exceeds Kling's 10s ceiling
     const maxDuration = 9.5;
 
-    console.log(`[videoProcessor] Checking compatibility for reference video: ${videoUrl} (model: ${targetModelId || 'generic'}, maxDuration: ${maxDuration}s)`);
+    console.log(`[videoProcessor] Checking compatibility for Kling reference video: ${videoUrl} (model: ${targetModelId || 'generic'})`);
     
     // Download video with generous 35s timeout
     const response = await axios.get(videoUrl, {

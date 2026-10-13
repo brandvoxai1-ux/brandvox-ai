@@ -941,7 +941,12 @@ export default function Studio() {
                 </div>
                 <VideoUploader
                   value={sourceVideoUrl}
-                  onUrlReady={(url) => setSourceVideoUrl(url)}
+                  onUrlReady={(url, dur) => {
+                    setSourceVideoUrl(url);
+                    if (dur && !isNaN(dur)) {
+                      setDuration(Math.max(3, Math.min(30, Math.round(dur))));
+                    }
+                  }}
                   onClear={() => setSourceVideoUrl('')}
                   compact
                 />
@@ -1205,8 +1210,8 @@ export default function Studio() {
               }
             />
 
-            {/* Discrete Duration Selector (video + swap) */}
-            {(activeMode === 'video' || activeMode === 'swap') && (
+            {/* Discrete Duration Selector (video only) */}
+            {activeMode === 'video' && (
               <div className="flex flex-col space-y-1.5">
                 <div className="flex justify-between text-[10px] font-bold text-white/50 tracking-wider">
                   <span>Duration</span>
@@ -1233,6 +1238,17 @@ export default function Studio() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Natural Video Length Indicator (Character Swap mode) */}
+            {activeMode === 'swap' && (
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/8 text-xs">
+                <span className="text-white/60 font-semibold text-[11px]">Output Duration</span>
+                <span className="text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Natural ({duration}s from source)
+                </span>
               </div>
             )}
 

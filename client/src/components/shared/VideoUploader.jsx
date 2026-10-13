@@ -52,17 +52,6 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
 
       if (meta && typeof meta.duration === 'number' && !isNaN(meta.duration)) {
         setVideoDuration(meta.duration);
-        if (meta.duration > 9.5) {
-          toast(
-            `Clip is ${meta.duration.toFixed(1)}s. Our AI pipeline will auto-trim the first 9.5s to fit Kling & Seedance limits perfectly.`,
-            { icon: '✂️', duration: 4500 }
-          );
-        } else if (meta.duration < 2.5) {
-          toast(
-            `Clip is ${meta.duration.toFixed(1)}s. AI engine requires at least 3s and will auto-loop frames.`,
-            { icon: '🔄', duration: 4000 }
-          );
-        }
       }
     } catch (_) {}
 
@@ -79,8 +68,8 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
 
       const permanentUrl = res.data.url;
       setPreview(permanentUrl);
-      onUrlReady(permanentUrl);
-      toast.success('Source video ready!');
+      onUrlReady(permanentUrl, meta?.duration);
+      toast.success(meta?.duration ? `Source video ready (${meta.duration.toFixed(1)}s)!` : 'Source video ready!');
     } catch (err) {
       setPreview(null);
       setFileName('');
