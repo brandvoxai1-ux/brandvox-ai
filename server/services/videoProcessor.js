@@ -94,12 +94,10 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
     console.log(`[videoProcessor] Reference video probed: ${width}x${height}, duration: ${duration}s, sar: ${sar || '1:1'} (maxDuration: ${maxDuration || 'unlimited'})`);
 
     const needsUpscale = width < 720 || height < 720;
-    const needsLoop = duration < 2.0;
-    const needsDurationCap = maxDuration && duration > maxDuration;
     const needsSarFix = isNonSquareSar;
 
-    if (!needsUpscale && !needsLoop && !needsDurationCap && !needsSarFix) {
-      console.log(`[videoProcessor] Video satisfies dimensions (>=720px), duration (${duration}s), and square pixels (1:1). Passing full original buffer.`);
+    if (!needsUpscale && !needsSarFix) {
+      console.log(`[videoProcessor] Video satisfies dimensions (>=720px) and square pixels (1:1). Passing full original buffer without modification.`);
       return { buffer: inputBuffer, width, height, processed: false };
     }
 
@@ -121,14 +119,11 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
       targetH = Math.round(targetH / 16) * 16;
     }
 
-    // Build FFmpeg command with high quality bicubic scaling, square pixel PAR (1:1), and audio stream mapping
+    // Build FFmpeg command: upscale only, NEVER trim or cut duration, preserve full audio
     const filter = `scale=${targetW}:${targetH}:flags=bicubic,setsar=1`;
-    const loopCount = needsLoop ? Math.max(1, Math.ceil(2.5 / Math.max(0.5, duration)) - 1) : 0;
-    const loopArg = loopCount > 0 ? `-stream_loop ${loopCount} ` : '';
-    const durationLimit = needsLoop ? '-t 3' : (needsDurationCap ? `-t ${maxDuration}` : '');
-    const ffmpegCmd = `"${ffmpegPath}" -y ${loopArg}-i "${inputPath}" ${durationLimit} -vf "${filter}" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
+    const ffmpegCmd = `"${ffmpegPath}" -y -i "${inputPath}" -vf "${filter}" -map 0:v:0 -map 0:a? -c:v libx264 -pix_fmt yuv420p -preset fast -crf 20 -c:a aac -b:a 192k "${outputPath}"`;
 
-    console.log(`[videoProcessor] Running FFmpeg optimization: ${ffmpegCmd}`);
+    console.log(`[videoProcessor] Running FFmpeg HD upscale: ${ffmpegCmd}`);
     await execWithTimeout(ffmpegCmd, 35000);
 
     if (fs.existsSync(outputPath)) {
@@ -188,7 +183,7 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, tar
     });
 
     const inputBuffer = Buffer.from(response.data);
-    const result = await processReferenceVideoBuffer(inputBuffer, 'video/mp4', { maxDuration });
+    const result = await processReferenceVideoBuffer(inputBuffer, 'video/mp4');
 
     if (!result.processed) {
       // Already valid or processing unavailable

@@ -28,52 +28,39 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
     image_url
   } = req.body;
 
-  // 1. Inputs validation
-  if (!prompt || prompt.trim().length === 0) {
-    return res.status(400).json({ error: 'Please enter a detailed prompt describing your video.' });
-  }
+  // 1. Inputs normalization (unrestricted: prompt is optional with automatic high-fidelity default)
+  const effectivePrompt = (prompt && prompt.trim()) || (image_url ? 'Animate this photo with fluid natural cinematic motion, 8k broadcast quality' : 'Cinematic high quality video scene, 8k photorealistic');
 
-  const safetyCheck = validatePromptSafety(prompt);
-  if (!safetyCheck.allowed) {
-    return res.status(400).json({ error: safetyCheck.reason });
-  }
-
-  if (prompt.length > 2000) {
-    return res.status(400).json({ error: 'Prompts cannot exceed 2000 characters.' });
-  }
-
-  if (!model_id) {
-    return res.status(400).json({ error: 'Please select an AI video model.' });
-  }
-
-  const selectedDuration = parseInt(duration) || 10; // default 10 seconds
+  const selectedDuration = parseInt(duration) || 10;
   const selectedAudio = generate_audio !== undefined ? !!generate_audio : true;
 
   try {
     // 2. Fetch model configuration to calculate exact cost
-    const { data: model, error: modelErr } = await supabase
+    let { data: model, error: modelErr } = await supabase
       .from('models')
       .select('*')
-      .eq('id', model_id)
+      .eq('id', model_id || 'seedance-2')
       .eq('is_active', true)
       .single();
 
     if (modelErr || !model) {
-      return res.status(404).json({ error: 'Selected model is not active or unavailable.' });
+      const { data: fallbackModel } = await supabase
+        .from('models')
+        .select('*')
+        .eq('model_type', 'video')
+        .eq('is_active', true)
+        .order('price_per_second', { ascending: true })
+        .limit(1)
+        .single();
+      model = fallbackModel;
     }
 
-    // Assert inputs compatibility: Only enforce image requirement if the model is strictly an image-to-video animator
-    if (model.id === 'seedance-2-i2v' && !image_url) {
-      return res.status(400).json({ error: 'An input image URL is required for Image-to-Video animation.' });
-    }
-
-    const maxAllowedDuration = parseInt(model.max_duration, 10) || 10;
-    if (selectedDuration > maxAllowedDuration) {
-      return res.status(400).json({ error: `Selected duration exceeds ${model.name} maximum of ${maxAllowedDuration} seconds.` });
+    if (!model) {
+      return res.status(404).json({ error: 'No video engine currently active.' });
     }
 
     // Cost = duration * price_per_second
-    const pricePerSec = parseFloat(model.price_per_second);
+    const pricePerSec = parseFloat(model.price_per_second || 2.5);
     const estimatedCost = selectedDuration * pricePerSec;
 
     // 3. Server-side credit check
@@ -84,13 +71,13 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
     }
 
     // 4. Create generation record in DB with 'pending' status
-    const defaultTitle = prompt.slice(0, 30).trim() + '...';
+    const defaultTitle = effectivePrompt.slice(0, 30).trim() + '...';
     const { data: generation, error: dbErr } = await supabase
       .from('generations')
       .insert({
         user_id: req.user.id,
         title: defaultTitle,
-        prompt: prompt,
+        prompt: effectivePrompt,
         model_id: model.id,
         model_name: model.name,
         status: 'pending',
@@ -123,7 +110,7 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
     try {
       result = await replicateService.generateVideo({
         endpoint: model.fal_endpoint,
-        prompt: prompt,
+        prompt: effectivePrompt,
         duration: selectedDuration,
         resolution: resolution || model.supported_resolutions?.[0],
         aspect_ratio: aspect_ratio || model.supported_aspects?.[0],
@@ -461,27 +448,13 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
     aspect_ratio
   } = req.body;
 
-  if (!source_video_url) {
-    return res.status(400).json({ error: 'Source motion video is required for character replacement.' });
-  }
-
   // Normalize multi-character list
   let normalizedCharacters = Array.isArray(characters) && characters.length > 0 ? characters : [];
   if (normalizedCharacters.length === 0 && target_character_url) {
     normalizedCharacters = [{ target_image_url: target_character_url, label: '' }];
   }
   const primaryCharacterUrl = normalizedCharacters[0]?.target_image_url || target_character_url || null;
-
-  if (!primaryCharacterUrl && (!prompt || prompt.trim().length === 0)) {
-    return res.status(400).json({ error: 'Please provide at least one target character image or a detailed character prompt.' });
-  }
-
-  if (prompt) {
-    const safetyCheck = validatePromptSafety(prompt);
-    if (!safetyCheck.allowed) {
-      return res.status(400).json({ error: safetyCheck.reason });
-    }
-  }
+  const effectivePrompt = (prompt && prompt.trim()) || 'Recreate this reel with target character, exact motion transfer, photorealistic 8k';
 
   const selectedDuration = Math.max(3, Math.min(30, parseInt(duration) || 10));
   const targetModelId = model_id || 'seedance-2.5';
@@ -532,7 +505,7 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
     const insertPayload = {
       user_id: req.user.id,
       title: displayTitle,
-      prompt: prompt || 'Character replacement motion transfer',
+      prompt: effectivePrompt,
       model_id: model.id,
       model_name: model.name,
       status: 'pending',
@@ -597,7 +570,7 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
         target_character: primaryCharacterUrl,
         characters: normalizedCharacters,
         prop_image: prop_image_url,
-        prompt,
+        prompt: effectivePrompt,
         aspect_ratio: aspect_ratio || '16:9',
         resolution: generation.resolution || '720p',
         webhookUrl,

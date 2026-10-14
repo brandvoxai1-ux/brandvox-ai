@@ -33,8 +33,8 @@ export default function UnifiedMediaUploader({ assets = [], onChange, onOrientat
           continue;
         }
 
-        if (file.size > 200 * 1024 * 1024) {
-          toast.error(`"${file.name}" exceeds maximum 200MB limit.`);
+        if (file.size > 500 * 1024 * 1024) {
+          toast.error(`"${file.name}" exceeds maximum 500MB limit.`);
           continue;
         }
 

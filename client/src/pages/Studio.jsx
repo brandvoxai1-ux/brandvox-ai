@@ -498,25 +498,14 @@ export default function Studio() {
     }
   }, [models, selectedModel]);
 
-  // Handle Model change filters
+  // Handle Model change filters (unrestricted: preserves user's chosen duration, aspect, and resolution)
   useEffect(() => {
     if (selectedModel) {
-      // Auto adjust aspect options
       if (!selectedModel.supported_aspects?.includes(aspectRatio)) {
         setAspectRatio(selectedModel.supported_aspects?.[0] || '16:9');
       }
-      // Auto adjust resolution
       if (!selectedModel.supported_resolutions?.includes(resolution)) {
         setResolution(selectedModel.supported_resolutions?.[0] || '720p');
-      }
-      // Adjust duration limit to match the active model's true ceiling
-      if (selectedModel.id === 'minimax-hailuo') {
-        setDuration(6);
-      } else {
-        const modelMax = Number(selectedModel.max_duration) || 10;
-        if (modelMax > 0 && duration > modelMax) {
-          setDuration(modelMax);
-        }
       }
     }
   }, [selectedModel]);
@@ -775,39 +764,12 @@ export default function Studio() {
       return;
     }
 
-    if (activeMode !== 'swap' && !promptText.trim()) {
-      toast.error('Prompt description is empty.');
-      return;
-    }
-
-    if (activeMode === 'video' && imageUrl && selectedModel?.supports_image_input === false && !selectedModel.id.includes('seedance') && !selectedModel.id.includes('kling') && !selectedModel.id.includes('minimax')) {
-      toast.error('The selected model does not support image input. Remove the image or switch to an image-compatible model.');
-      return;
-    }
-
-    if (insufficientCredits) {
-      toast.error(`Insufficient balance. This model costs ₹${cost.toFixed(2)}, but your current balance is ₹${(profile?.credits || 0).toFixed(2)}.`);
-      return;
-    }
-
     isSubmittingRef.current = true;
 
     // SWAP MODE — Character Replacement / Video-to-Video Motion Transfer
-    if (activeMode === 'swap') {
-      if (!sourceVideoUrl) {
-        toast.error('Source motion video is required for character replacement.');
-        isSubmittingRef.current = false;
-        return;
-      }
-
+    if (activeMode === 'swap' && sourceVideoUrl) {
       const validCharacters = swapCharacters.filter(c => c.target_image_url && c.target_image_url.trim());
       const primaryChar = validCharacters[0]?.target_image_url || imageUrl || null;
-
-      if (!primaryChar && !promptText.trim()) {
-        toast.error('Please provide at least one target character photo or character description prompt.');
-        isSubmittingRef.current = false;
-        return;
-      }
 
       try {
         setGenerationStatus('pending');

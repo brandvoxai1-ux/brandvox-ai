@@ -11,14 +11,15 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: {
-    fileSize: 20 * 1024 * 1024 // 20 MB max
+    fileSize: 50 * 1024 * 1024 // 50 MB max
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (allowedTypes.includes(file.mimetype)) {
+    const isImage = file.mimetype?.startsWith('image/') ||
+      /\.(jpg|jpeg|png|webp|gif|bmp|tiff|avif|heic|heif)$/i.test(file.originalname);
+    if (isImage) {
       cb(null, true);
     } else {
-      cb(new Error('Only JPEG, PNG, WebP, and GIF image files are allowed.'));
+      cb(new Error('Please upload a valid image file.'));
     }
   }
 });
@@ -70,7 +71,7 @@ router.post('/image', authMiddleware, upload.single('file'), async (req, res) =>
 const videoUpload = multer({
   storage,
   limits: {
-    fileSize: 200 * 1024 * 1024 // 200 MB max for videos up to 30s+ in high quality
+    fileSize: 500 * 1024 * 1024 // 500 MB max for high-res long videos
   },
   fileFilter: (req, file, cb) => {
     const isVideo = file.mimetype?.startsWith('video/') ||
