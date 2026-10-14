@@ -484,7 +484,7 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
   }
 
   const selectedDuration = Math.max(3, Math.min(30, parseInt(duration) || 10));
-  const targetModelId = model_id || 'kling-3-omni';
+  const targetModelId = model_id || 'seedance-2.5';
 
   try {
     // 1. Fetch model configuration
@@ -574,13 +574,13 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
     const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
     const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
 
-    // 5. Auto-conform reference video with swift 15s race (falls back to source URL if slow)
+    // 5. Auto-conform reference video with 45s race (conforms low-res to 720p HD so AI provider never rejects with E006)
     let readyVideoUrl = source_video_url;
     try {
       const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
       readyVideoUrl = await Promise.race([
         ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase, model.id || model.fal_endpoint),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Conformance check timed out')), 15000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Conformance check timed out')), 45000))
       ]);
       console.log(`[CharacterSwap] Using verified reference video URL: ${readyVideoUrl}`);
     } catch (vProcErr) {
@@ -957,7 +957,12 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
       }
 
       // Auto-fallback for character swap: if Seedance 2.5 fails, automatically retry on Kling 3.0 Omni (or vice versa)
-      if (gen.generation_type === 'swap' && !gen.error_message?.includes('[swap-fallback-attempted]')) {
+      const isSwap = gen.generation_type === 'swap' || 
+                     String(gen.title || '').includes('Character Swap') || 
+                     String(gen.title || '').includes('Character Replacement') ||
+                     Boolean(memoryCache.get(`swap_assets_${generationId}`));
+
+      if (isSwap && !gen.error_message?.includes('[swap-fallback-attempted]')) {
         const currentModel = String(gen.model_name || gen.model_id || '').toLowerCase();
         const fallbackTarget = currentModel.includes('seedance')
           ? 'kwaivgi/kling-v3-omni-video'
@@ -1133,7 +1138,12 @@ router.get('/:id/status', authMiddleware, async (req, res) => {
             const mediaUrl = replicateService.extractMediaUrl(pred.output);
             if (mediaUrl) gen.video_url = mediaUrl;
           } else if (pred.status === 'failed') {
-            if (gen.generation_type === 'swap' && !gen.error_message?.includes('[swap-fallback-attempted]')) {
+            const isSwapPolling = gen.generation_type === 'swap' || 
+                                  String(gen.title || '').includes('Character Swap') || 
+                                  String(gen.title || '').includes('Character Replacement') ||
+                                  Boolean(memoryCache.get(`swap_assets_${gen.id}`));
+
+            if (isSwapPolling && !gen.error_message?.includes('[swap-fallback-attempted]')) {
               gen.status = 'processing';
             } else {
               gen.status = 'failed';
