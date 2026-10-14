@@ -124,6 +124,9 @@ export default function AdminUsers() {
           <Search className="w-4 h-4 text-purple-300/40 absolute left-3 top-1/2 transform -translate-y-1/2" />
           <input
             type="text"
+            id="admin-search-users"
+            name="adminSearchUsers"
+            aria-label="Search users by email or full name"
             placeholder="Search email or full name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}

@@ -168,6 +168,9 @@ export default function UnifiedMediaUploader({ assets = [], onChange, onOrientat
         <input
           ref={fileInputRef}
           type="file"
+          id="unified-media-file-input"
+          name="mediaFiles"
+          aria-label="Upload media files"
           multiple
           accept="image/*,video/*,audio/*"
           onChange={(e) => handleFiles(e.target.files)}

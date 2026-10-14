@@ -210,6 +210,9 @@ export default function Settings() {
               </div>
 
               <Input
+                id="profile-fullname"
+                name="fullName"
+                autoComplete="name"
                 label="Full Name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -217,7 +220,7 @@ export default function Settings() {
               />
 
               <div className="flex flex-col space-y-1.5 w-full">
-                <label className="text-xs font-bold text-white/50 uppercase tracking-wider">Email Address</label>
+                <span className="text-xs font-bold text-white/50 uppercase tracking-wider">Email Address</span>
                 <div className="bg-surface-elevated text-white/40 border border-white/5 px-4 py-2.5 rounded-lg text-sm flex items-center justify-between">
                   <span>{profile?.email}</span>
                   <Mail className="w-4 h-4 text-white/20" />
@@ -240,6 +243,9 @@ export default function Settings() {
 
               <div className="relative">
                 <Input
+                  id="new-password"
+                  name="newPassword"
+                  autoComplete="new-password"
                   label="New Password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="At least 6 characters"
@@ -257,6 +263,9 @@ export default function Settings() {
               </div>
 
               <Input
+                id="confirm-password"
+                name="confirmPassword"
+                autoComplete="new-password"
                 label="Confirm New Password"
                 type="password"
                 placeholder="Confirm password"
@@ -279,31 +288,35 @@ export default function Settings() {
               </h3>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between bg-surface-elevated px-4 py-3.5 rounded-xl border border-white/5">
+                <label htmlFor="notif-complete" className="flex items-center justify-between bg-surface-elevated px-4 py-3.5 rounded-xl border border-white/5 cursor-pointer hover:bg-surface-hover transition-colors">
                   <div>
                     <h4 className="text-xs font-bold text-white">Video Compilation Alerts</h4>
                     <p className="text-[10px] text-white/40 mt-0.5">Receive browser alerts upon complete compiles</p>
                   </div>
                   <input
                     type="checkbox"
+                    id="notif-complete"
+                    name="notifComplete"
                     checked={notifComplete}
                     onChange={(e) => handleToggleNotifComplete(e.target.checked)}
-                    className="w-4.5 h-4.5 accent-primary rounded bg-surface border-white/10"
+                    className="w-4.5 h-4.5 accent-primary rounded bg-surface border-white/10 cursor-pointer"
                   />
-                </div>
+                </label>
 
-                <div className="flex items-center justify-between bg-surface-elevated px-4 py-3.5 rounded-xl border border-white/5">
+                <label htmlFor="notif-purchase" className="flex items-center justify-between bg-surface-elevated px-4 py-3.5 rounded-xl border border-white/5 cursor-pointer hover:bg-surface-hover transition-colors">
                   <div>
                     <h4 className="text-xs font-bold text-white">UPI Payment Confirmations</h4>
                     <p className="text-[10px] text-white/40 mt-0.5">Receive confirmations for credit package top-ups</p>
                   </div>
                   <input
                     type="checkbox"
+                    id="notif-purchase"
+                    name="notifPurchase"
                     checked={notifPurchase}
                     onChange={(e) => handleToggleNotifPurchase(e.target.checked)}
-                    className="w-4.5 h-4.5 accent-primary rounded bg-surface border-white/10"
+                    className="w-4.5 h-4.5 accent-primary rounded bg-surface border-white/10 cursor-pointer"
                   />
-                </div>
+                </label>
               </div>
             </div>
           )}

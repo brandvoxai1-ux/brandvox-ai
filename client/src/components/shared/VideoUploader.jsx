@@ -168,6 +168,9 @@ export default function VideoUploader({ value, onUrlReady, onClear, compact = fa
         <input
           ref={fileInputRef}
           type="file"
+          id="video-uploader-file-input"
+          name="videoFile"
+          aria-label="Upload video file"
           accept="video/*"
           onChange={handleInputChange}
           className="hidden"

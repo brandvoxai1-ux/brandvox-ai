@@ -141,6 +141,9 @@ export default function Auth() {
 
           {mode === 'signup' && (
             <Input
+              id="auth-fullName"
+              name="fullName"
+              autoComplete="name"
               label="Full Name"
               type="text"
               placeholder="e.g. Aarav Kumar"
@@ -151,6 +154,9 @@ export default function Auth() {
           )}
 
           <Input
+            id="auth-email"
+            name="email"
+            autoComplete="email"
             label="Email Address"
             type="email"
             placeholder="your@email.com"
@@ -162,6 +168,9 @@ export default function Auth() {
           {mode !== 'forgot' && (
             <div className="relative">
               <Input
+                id="auth-password"
+                name="password"
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 label="Password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
@@ -181,6 +190,9 @@ export default function Auth() {
 
           {mode === 'signup' && (
             <Input
+              id="auth-confirmPassword"
+              name="confirmPassword"
+              autoComplete="new-password"
               label="Confirm Password"
               type="password"
               placeholder="••••••••"

@@ -211,6 +211,9 @@ export default function ImageUploader({ value, onUrlReady, onClear, onDimensions
       <input
         ref={fileInputRef}
         type="file"
+        id="image-uploader-file-input"
+        name="imageFile"
+        aria-label="Upload reference character image"
         accept="image/jpeg,image/png,image/webp,image/gif"
         onChange={handleInputChange}
         className="hidden"

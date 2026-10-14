@@ -9,6 +9,7 @@ const generateRouter = require('./routes/generate');
 const creditsRouter = require('./routes/credits');
 const adminRouter = require('./routes/admin');
 const uploadRouter = require('./routes/upload');
+const templatesRouter = require('./routes/templates');
 const { initCleanupService } = require('./services/cleanupService');
 const { initStaleWorker } = require('./services/staleWorker');
 
@@ -46,6 +47,7 @@ app.use('/api/generate', generateRouter);
 app.use('/api/credits', creditsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/templates', templatesRouter);
 
 const memoryCache = require('./lib/cache');
 

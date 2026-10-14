@@ -152,6 +152,9 @@ export default function Projects() {
             <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 transform -translate-y-1/2" />
             <input
               type="text"
+              id="projects-search-input"
+              name="projectSearch"
+              aria-label="Search creations by name or prompt keyword"
               placeholder="Search creation name or prompt keyword..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

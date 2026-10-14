@@ -87,7 +87,9 @@ export default function Studio() {
   const modelPickerRef = useRef(null);
   const [imageUrl, setImageUrl] = useState(''); // Target character image or Image-to-Video source
   const [sourceVideoUrl, setSourceVideoUrl] = useState(() => {
-    return location.state?.remixMedia?.video_url || '';
+    return location.state?.remixMedia?.video_url || 
+           location.state?.template?.source_video_url || 
+           location.state?.template?.preview_video_url || '';
   }); // Character Swap source motion video
   const [remixImageUrl, setRemixImageUrl] = useState(() => {
     if (location.state?.mediaType === 'image' || location.state?.remixMedia?.generation_type === 'image') {
@@ -102,13 +104,16 @@ export default function Studio() {
   // Higgsfield Unified Media Assets state
   const [mediaAssets, setMediaAssets] = useState(() => {
     const list = [];
-    if (location.state?.remixMedia?.video_url) {
+    const vidUrl = location.state?.remixMedia?.video_url || 
+                   location.state?.template?.source_video_url || 
+                   location.state?.template?.preview_video_url;
+    if (vidUrl) {
       list.push({
-        id: 'initial_video',
+        id: 'initial_template_video',
         type: 'video',
         tag: '@Video1',
-        url: location.state.remixMedia.video_url,
-        name: 'Source Motion Video'
+        url: vidUrl,
+        name: location.state?.template?.title ? `${location.state.template.title}.mp4` : 'Source Motion Reel'
       });
     }
     return list;
@@ -117,30 +122,37 @@ export default function Studio() {
   const handleMediaAssetsChange = (newAssets) => {
     setMediaAssets(newAssets);
     const vid = newAssets.find(a => a.type === 'video');
-    const img = newAssets.find(a => a.type === 'image');
+    const images = newAssets.filter(a => a.type === 'image');
     setSourceVideoUrl(vid ? vid.url : '');
-    setImageUrl(img ? img.url : '');
-    if (img) {
-      setSwapCharacters([{ id: 'char-1', target_image_url: img.url, label: '' }]);
+    
+    if (images.length > 0) {
+      setImageUrl(images[0].url);
+      setSwapCharacters(images.map((imgAsset, idx) => ({
+        id: imgAsset.id || `char-${idx + 1}`,
+        target_image_url: imgAsset.url,
+        label: imgAsset.tag || `@Image${idx + 1}`
+      })));
     } else {
+      setImageUrl('');
       setSwapCharacters([]);
     }
+
     if (vid) {
       if (vid.duration && !isNaN(vid.duration)) {
         const naturalDur = Math.round(vid.duration);
-        const maxForModel = Number(selectedModel?.max_duration) || 10;
-        const clampedDur = Math.max(3, Math.min(maxForModel, naturalDur));
+        const maxDurationCap = 30;
+        const clampedDur = Math.max(3, Math.min(maxDurationCap, naturalDur));
         setDuration(clampedDur);
-        if (naturalDur > maxForModel) {
-          toast(`Source video is ${naturalDur}s: auto-trimmed to ${maxForModel}s (${selectedModel?.name || 'AI'} tensor limit)`, { icon: '⏱️', duration: 3500 });
+        if (naturalDur > maxDurationCap) {
+          toast(`Source video is ${naturalDur}s: optimized to maximum ${maxDurationCap}s`, { icon: '⏱️', duration: 3000 });
         } else {
-          toast(`Detected source video length: ${clampedDur}s`, { icon: '⏱️', duration: 2500 });
+          toast.success(`Video duration set to ${clampedDur}s`, { icon: '⏱️', duration: 2000 });
         }
       }
     }
-    if (vid && img) {
+    if (vid && images.length > 0) {
       setActiveMode('swap');
-    } else if (img && !vid) {
+    } else if (images.length > 0 && !vid) {
       setActiveMode('video');
     }
   };
@@ -271,6 +283,21 @@ export default function Studio() {
       if (tpl.aspect_ratio) setAspectRatio(tpl.aspect_ratio);
       if (tpl.duration) setDuration(tpl.duration);
       if (tpl.media_type) setActiveMode(tpl.media_type);
+      const vidUrl = tpl.source_video_url || tpl.preview_video_url;
+      if (vidUrl) {
+        setSourceVideoUrl(vidUrl);
+        setMediaAssets(prev => {
+          const withoutVid = prev.filter(a => a.type !== 'video');
+          return [{
+            id: 'template_reel_video',
+            type: 'video',
+            tag: '@Video1',
+            url: vidUrl,
+            name: `${tpl.title || 'Trending Reel'}.mp4`
+          }, ...withoutVid];
+        });
+        setActiveMode('swap');
+      }
       if (tpl.model_id && models.length > 0) {
         const found = models.find(m => m.id === tpl.model_id || m.fal_endpoint === tpl.model_id);
         if (found) setSelectedModel(found);
@@ -732,8 +759,13 @@ export default function Studio() {
     }
   };
 
+  const isSubmittingRef = useRef(false);
+
   // Dispatch Generation job
   const handleGenerate = async () => {
+    if (isSubmittingRef.current) return;
+    if (generationStatus === 'pending' || generationStatus === 'processing' || imageGenerating) return;
+
     if (failedGenId) {
       deleteGeneration(failedGenId).catch(() => {});
       setFailedGenId(null);
@@ -758,10 +790,13 @@ export default function Studio() {
       return;
     }
 
+    isSubmittingRef.current = true;
+
     // SWAP MODE — Character Replacement / Video-to-Video Motion Transfer
     if (activeMode === 'swap') {
       if (!sourceVideoUrl) {
         toast.error('Source motion video is required for character replacement.');
+        isSubmittingRef.current = false;
         return;
       }
 
@@ -770,6 +805,7 @@ export default function Studio() {
 
       if (!primaryChar && !promptText.trim()) {
         toast.error('Please provide at least one target character photo or character description prompt.');
+        isSubmittingRef.current = false;
         return;
       }
 
@@ -805,6 +841,8 @@ export default function Studio() {
         setGenerationStatus('idle');
         refreshProfile();
         toast.error(err.message || 'Character swap failed to submit.');
+      } finally {
+        setTimeout(() => { isSubmittingRef.current = false; }, 1000);
       }
       return;
     }
@@ -830,6 +868,7 @@ export default function Studio() {
       } finally {
         setImageGenerating(false);
         await refreshProfile();
+        setTimeout(() => { isSubmittingRef.current = false; }, 1000);
       }
       return;
     }
@@ -862,10 +901,12 @@ export default function Studio() {
       setGenerationStatus('idle');
       refreshProfile();
       toast.error(err.message || 'Generation failed to submit.');
+    } finally {
+      setTimeout(() => { isSubmittingRef.current = false; }, 1000);
     }
   };
 
-  // Keyboard Event Handlers
+  // Keyboard Event Handlers (with strict cleanup to prevent memory leaks and burst requests)
   useEffect(() => {
     const handleShortcuts = (e) => {
       // Ctrl + Enter to generate
@@ -880,16 +921,17 @@ export default function Studio() {
       }
     };
     window.addEventListener('keydown', handleShortcuts);
-  }, [promptText, selectedModel, duration, resolution, aspectRatio, imageUrl, insufficientCredits]);
+    return () => window.removeEventListener('keydown', handleShortcuts);
+  }, [promptText, selectedModel, duration, resolution, aspectRatio, imageUrl, insufficientCredits, generationStatus, imageGenerating]);
 
   const renderControlPanelContent = (isMobile = false) => (
     <div className="space-y-4">
       {/* 1. HIGGSFIELD UNIFIED MEDIA DROPZONE */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest flex items-center justify-between">
+        <div className="text-[10px] font-bold text-white/50 uppercase tracking-widest flex items-center justify-between">
           <span>Media Input</span>
           <span className="text-[9px] text-white/30 font-normal">Auto-detects 9:16</span>
-        </label>
+        </div>
         <UnifiedMediaUploader
           assets={mediaAssets}
           onChange={handleMediaAssetsChange}
@@ -899,13 +941,13 @@ export default function Studio() {
           }}
           onDurationDetected={(detectedDur) => {
             const rawDur = Math.round(detectedDur);
-            const modelMax = Number(selectedModel?.max_duration) || 10;
-            const clamped = Math.max(3, Math.min(modelMax, rawDur));
+            const maxDurationCap = 30;
+            const clamped = Math.max(3, Math.min(maxDurationCap, rawDur));
             setDuration(clamped);
-            if (rawDur > modelMax) {
-              toast(`Video is ${rawDur}s: trimmed to ${modelMax}s (${selectedModel?.name || 'AI'} tensor limit)`, { icon: '⏱️', duration: 3500 });
+            if (rawDur > maxDurationCap) {
+              toast(`Video is ${rawDur}s: optimized to maximum ${maxDurationCap}s`, { icon: '⏱️', duration: 3000 });
             } else {
-              toast(`Detected video length: ${clamped}s`, { icon: '⏱️', duration: 2000 });
+              toast.success(`Video duration set to ${clamped}s`, { icon: '⏱️', duration: 2000 });
             }
           }}
         />
@@ -914,7 +956,7 @@ export default function Studio() {
       {/* 2. HIGGSFIELD PROMPT BOX WITH @ ELEMENTS & AUDIO */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest">
+          <label htmlFor="studio-prompt-sidebar" className="text-[10px] font-bold text-white/50 uppercase tracking-widest">
             Prompt & Scene Direction
           </label>
           <button
@@ -931,6 +973,8 @@ export default function Studio() {
 
         <div className="bg-[#121316] border border-white/12 focus-within:border-yellow-400/60 rounded-2xl p-3 transition-all space-y-2.5 shadow-inner">
           <textarea
+            id="studio-prompt-sidebar"
+            name="prompt"
             ref={promptRef}
             placeholder="Describe your scene in detail. Use @ to reference assets (e.g. Replace character in @Video1 with @Image1)..."
             value={promptText}
@@ -981,7 +1025,7 @@ export default function Studio() {
 
       {/* 3. MODEL SELECTOR */}
       <div className="space-y-1.5 relative" ref={modelPickerRef}>
-        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest block">AI Model</label>
+        <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest block">AI Model</span>
         <button
           type="button"
           onClick={() => setModelPickerOpen(o => !o)}
@@ -1038,21 +1082,17 @@ export default function Studio() {
 
       {/* 4. 3 AUTO PILLS (Duration • Aspect Ratio • Resolution) */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest block">Output Format</label>
+        <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest block">Output Format</span>
         <div className="grid grid-cols-3 gap-1.5">
           {/* Duration Pill */}
           <button
             type="button"
             onClick={() => {
-              const maxAllowed = Number(selectedModel?.max_duration) || 10;
               if (selectedModel?.id === 'minimax-hailuo') {
                 toast('MiniMax Hailuo generates fixed 6s video clips', { icon: 'ℹ️' });
                 return;
               }
-              let options = [5, 10];
-              if (maxAllowed <= 5) options = [5];
-              else if (maxAllowed <= 6) options = [6];
-              else if (maxAllowed >= 15) options = [5, 10, 15];
+              let options = [5, 10, 15, 20, 30];
 
               const currentIdx = options.indexOf(duration);
               const next = options[(currentIdx + 1) % options.length] || options[0];
@@ -1060,7 +1100,7 @@ export default function Studio() {
               toast(`Duration set to ${next}s`, { icon: '⏱️', duration: 1200 });
             }}
             className="flex items-center justify-center gap-1 py-2 px-1 rounded-xl bg-[#121316] border border-white/10 hover:border-white/20 text-xs font-semibold text-white/80 transition-colors cursor-pointer"
-            title={`Click to cycle duration (${selectedModel?.name || 'Model'}: max ${Number(selectedModel?.max_duration) || 10}s)`}
+            title="Click to cycle duration (5s to 30s)"
           >
             <Clock className="w-3 h-3 text-white/40" />
             <span>{duration}s</span>
@@ -1654,6 +1694,9 @@ export default function Studio() {
             {/* Prompt Textarea */}
             <div className="relative">
               <textarea
+                id="studio-prompt-bottom"
+                name="promptBottom"
+                aria-label="Scene prompt"
                 ref={promptRef}
                 placeholder={
                   activeMode === 'swap'
@@ -1805,7 +1848,7 @@ export default function Studio() {
 
           {/* Quick Recent items */}
           <div className="space-y-3.5">
-            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Recent Creations</label>
+            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest block">Recent Creations</span>
             {recentVideos.length === 0 ? (
               <div className="text-center py-6 border border-dashed border-white/5 rounded-xl text-[10px] text-white/30 tracking-wider uppercase font-bold">
                 No videos ready

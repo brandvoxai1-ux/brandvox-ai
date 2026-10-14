@@ -249,6 +249,9 @@ export default function Explore() {
             <Search className="w-4 h-4 text-white/30 absolute left-3 top-1/2 transform -translate-y-1/2" />
             <input
               type="text"
+              id="explore-search-input"
+              name="exploreSearch"
+              aria-label="Search trending styles and prompts"
               placeholder="Search trending styles & prompts..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

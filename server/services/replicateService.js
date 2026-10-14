@@ -221,10 +221,12 @@ async function generateCharacterSwapVideo({
 }) {
   const resolved = resolveReplicateModel(endpoint, 'kwaivgi/kling-v3-omni-video');
 
-  // Primary model is kwaivgi/kling-v3-omni-video (verified working engine for V2V Character Swap)
-  const candidates = ['kwaivgi/kling-v3-omni-video'];
+  // Intelligent candidate list: user-selected engine first, then alternate engine for seamless resilience
+  const candidates = [];
   if (resolved.includes('seedance')) {
-    candidates.push('bytedance/seedance-2.5');
+    candidates.push('bytedance/seedance-2.5', 'kwaivgi/kling-v3-omni-video');
+  } else {
+    candidates.push('kwaivgi/kling-v3-omni-video', 'bytedance/seedance-2.5');
   }
 
   // Normalize characters list (supports both multi-character array and legacy single target_character)
@@ -248,18 +250,29 @@ async function generateCharacterSwapVideo({
     allReferenceImages.push(prop_image.trim());
   }
 
-  // Helper to translate @tag mentions into model-native syntax
+  // Helper to translate @tag mentions and natural English into model-native syntax
   const translatePromptTags = (rawPrompt, isSeedance) => {
     if (!rawPrompt || !rawPrompt.trim()) return '';
     const { sanitizePromptForVideo } = require('./promptSanitizer');
     let p = sanitizePromptForVideo(rawPrompt);
-    p = p.replace(/@(Video|Motion)\s*1?\b/gi, isSeedance ? '[Video1]' : '<<<video_1>>>');
+
+    // 1. Video / Motion references: @Video1, @Motion1, video 1, video1, source video, etc.
+    p = p.replace(/(?:@|\b)(?:source\s*video|video\s*1|video1|motion\s*1?)\b/gi, isSeedance ? '[Video1]' : '<<<video_1>>>');
+
+    // 2. Image / Character / Person references: @Image1, image 1, character 1, person 1, etc.
     for (let i = 1; i <= 5; i++) {
-      const charRegex = new RegExp(`@(Image|Char)\\s*${i}\\b`, 'gi');
+      const charRegex = new RegExp(`(?:@|\\b)(?:image|char|character|person)\\s*${i}\\b`, 'gi');
       p = p.replace(charRegex, isSeedance ? `[Image${i}]` : `<<<image_${i}>>>`);
     }
+
+    // 3. Fallback generic '@Video' / 'video'
+    p = p.replace(/@Video\b/gi, isSeedance ? '[Video1]' : '<<<video_1>>>');
+    // Generic '@Image'
+    p = p.replace(/@Image\b/gi, isSeedance ? '[Image1]' : '<<<image_1>>>');
+
+    // 4. Prop / Object references: @Prop, prop 1, object 1
     const propToken = isSeedance ? `[Image${propIndex}]` : `<<<image_${propIndex}>>>`;
-    p = p.replace(/@(Prop|Object)\b/gi, propToken);
+    p = p.replace(/(?:@|\b)(?:prop|object)\s*([1-5]?)\b/gi, propToken);
     return p;
   };
 

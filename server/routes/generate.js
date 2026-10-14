@@ -8,7 +8,7 @@ const replicateService = require('../services/replicateService');
 const creditService = require('../services/creditService');
 const { createNotification } = require('../services/notificationService');
 const { archiveVideo, archiveImage } = require('../services/storageService');
-const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
+const { ensureCompatibleReferenceVideoUrl, reMuxAudioFromSource } = require('../services/videoProcessor');
 const { enhanceAdPrompt, STYLE_PRESETS } = require('../services/promptEnhancer');
 const { validatePromptSafety } = require('../lib/moderation');
 const memoryCache = require('../lib/cache');
@@ -115,47 +115,59 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
       generation.id
     );
 
-    // 6. Return response immediately with record ID
+    // 6. Dispatch Replicate Generation and await prediction ID (guarantees serverless execution)
+    const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
+    const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
+
+    let result;
+    try {
+      result = await replicateService.generateVideo({
+        endpoint: model.fal_endpoint,
+        prompt: prompt,
+        duration: selectedDuration,
+        resolution: resolution || model.supported_resolutions?.[0],
+        aspect_ratio: aspect_ratio || model.supported_aspects?.[0],
+        generate_audio: selectedAudio,
+        image_url: image_url,
+        webhookUrl,
+        generationId: generation.id
+      });
+    } catch (dispErr) {
+      console.error(`[Generate] Replicate dispatch error for ${generation.id}:`, dispErr);
+      await creditService.addCredits(
+        req.user.id,
+        parseFloat(estimatedCost),
+        `Refund for failed generation ${generation.id}`,
+        `refund-${generation.id}`,
+        `refund-${generation.id}`,
+        'refund'
+      );
+      await supabase.from('generations').update({ status: 'failed', error_message: dispErr.message || 'Dispatch error' }).eq('id', generation.id);
+      return res.status(500).json({ error: dispErr.message || 'Failed to dispatch AI video generation.' });
+    }
+
+    if (result.request_id) {
+      await supabase
+        .from('generations')
+        .update({ status: 'processing', fal_request_id: result.request_id })
+        .eq('id', generation.id);
+    }
+
+    // Return response to client with confirmed prediction ID
     res.status(202).json({
       success: true,
       message: 'Generation initiated successfully.',
       generationId: generation.id,
+      requestId: result.request_id,
       estimatedCost
     });
 
-    // 7. Dispatch Replicate Generation in the background
+    // 7. Background tracking & polling (runs concurrently without blocking HTTP)
     (async () => {
       try {
-        // Update status to 'processing'
-        await supabase
-          .from('generations')
-          .update({ status: 'processing' })
-          .eq('id', generation.id);
-
-        console.log(`[BackgroundWorker] Executing Replicate job for gen: ${generation.id}`);
-
-        const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
-        const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
-
-        const result = await replicateService.generateVideo({
-          endpoint: model.fal_endpoint,
-          prompt: prompt,
-          duration: selectedDuration,
-          resolution: resolution || model.supported_resolutions?.[0],
-          aspect_ratio: aspect_ratio || model.supported_aspects?.[0],
-          generate_audio: selectedAudio,
-          image_url: image_url,
-          webhookUrl,
-          generationId: generation.id
-        });
+        console.log(`[BackgroundWorker] Tracking Replicate job for gen: ${generation.id} (${result.request_id})`);
 
         if (result.request_id) {
-          // Store prediction ID in DB to track it
-          await supabase
-            .from('generations')
-            .update({ fal_request_id: result.request_id })
-            .eq('id', generation.id);
-
           // Local webhook simulation / polling
           const isLocalhost = webhookUrl.includes('localhost') || webhookUrl.includes('127.0.0.1');
           if (isLocalhost) {
@@ -471,7 +483,7 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
     }
   }
 
-  const selectedDuration = Math.max(3, Math.min(10, parseInt(duration) || 10));
+  const selectedDuration = Math.max(3, Math.min(30, parseInt(duration) || 10));
   const targetModelId = model_id || 'kling-3-omni';
 
   try {
@@ -559,62 +571,69 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
       prop_image_url
     }, 7200);
 
-    // 5. Send early response to client
+    const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
+    const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
+
+    // 5. Auto-conform reference video with swift 15s race (falls back to source URL if slow)
+    let readyVideoUrl = source_video_url;
+    try {
+      const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
+      readyVideoUrl = await Promise.race([
+        ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase, model.id || model.fal_endpoint),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Conformance check timed out')), 15000))
+      ]);
+      console.log(`[CharacterSwap] Using verified reference video URL: ${readyVideoUrl}`);
+    } catch (vProcErr) {
+      console.warn('[CharacterSwap] Video processor notice, using source URL:', vProcErr.message);
+      readyVideoUrl = source_video_url;
+    }
+
+    // 6. Dispatch Replicate Character Swap and await prediction ID
+    let result;
+    try {
+      result = await replicateService.generateCharacterSwapVideo({
+        endpoint: model.fal_endpoint,
+        source_video: readyVideoUrl,
+        target_character: primaryCharacterUrl,
+        characters: normalizedCharacters,
+        prop_image: prop_image_url,
+        prompt,
+        aspect_ratio: aspect_ratio || '16:9',
+        resolution: generation.resolution || '720p',
+        webhookUrl,
+        generationId: generation.id
+      });
+    } catch (swapErr) {
+      console.error(`[CharacterSwap] Replicate dispatch error for ${generation.id}:`, swapErr);
+      await creditService.addCredits(
+        req.user.id,
+        parseFloat(estimatedCost),
+        `Refund for failed character swap ${generation.id}`,
+        `refund-${generation.id}`,
+        `refund-${generation.id}`,
+        'refund'
+      );
+      await supabase.from('generations').update({ status: 'failed', error_message: swapErr.message || 'Dispatch error' }).eq('id', generation.id);
+      return res.status(500).json({ error: swapErr.message || 'Failed to dispatch character swap generation.' });
+    }
+
+    const updatePayload = { status: 'processing', fal_request_id: result.request_id };
+    if (result.model_used) updatePayload.model_name = result.model_used;
+    await supabase.from('generations').update(updatePayload).eq('id', generation.id);
+
+    // 7. Send confirmed response to client
     res.status(202).json({
       success: true,
       message: 'Character swap generation initiated successfully.',
       generationId: generation.id,
+      requestId: result.request_id,
       estimatedCost
     });
 
-    // 6. Background async processing
+    // 8. Background prediction tracking & webhook fallback
     (async () => {
       try {
-        await supabase
-          .from('generations')
-          .update({ status: 'processing' })
-          .eq('id', generation.id);
-
-        const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
-        const webhookUrl = `${process.env.RENDER_EXTERNAL_URL || vercelUrl || process.env.API_URL || 'http://localhost:5000'}/api/generate/webhook`;
-
-        // Auto-conform and ensure source video meets AI provider HD & duration specs
-        let readyVideoUrl = source_video_url;
-        try {
-          const { ensureCompatibleReferenceVideoUrl } = require('../services/videoProcessor');
-          // 45s timeout race so video conformance can reliably finish
-          readyVideoUrl = await Promise.race([
-            ensureCompatibleReferenceVideoUrl(source_video_url, req.user.id, supabase, model.id || model.fal_endpoint),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Conformance check timed out')), 45000))
-          ]);
-          console.log(`[CharacterSwap] Using verified reference video URL: ${readyVideoUrl}`);
-        } catch (vProcErr) {
-          console.warn('[CharacterSwap] Video processor warning, using source URL:', vProcErr.message);
-          readyVideoUrl = source_video_url;
-        }
-
-        const result = await replicateService.generateCharacterSwapVideo({
-          endpoint: model.fal_endpoint,
-          source_video: readyVideoUrl,
-          target_character: primaryCharacterUrl,
-          characters: normalizedCharacters,
-          prop_image: prop_image_url,
-          prompt,
-          aspect_ratio: aspect_ratio || '16:9',
-          resolution: generation.resolution || '720p',
-          webhookUrl,
-          generationId: generation.id
-        });
-
         if (result.request_id) {
-          const updatePayload = { fal_request_id: result.request_id };
-          if (result.model_used) updatePayload.model_name = result.model_used;
-          await supabase
-            .from('generations')
-            .update(updatePayload)
-            .eq('id', generation.id);
-
-          // Background prediction tracking (runs on both localhost and production as webhook fallback)
           console.log(`[CharacterSwap] Initiating background prediction tracking for: ${result.request_id}`);
           (async () => {
             try {
@@ -660,6 +679,18 @@ router.post(['/swap', '/character-swap'], authMiddleware, generationLimiter, asy
             `Your character replacement video with "${model.name}" has completed successfully.`,
             'success'
           );
+
+          // Check if source video had an original soundtrack that should be preserved on the AI output
+          if (source_video_url) {
+            reMuxAudioFromSource(result.video_url, source_video_url, supabase, req.user.id)
+              .then(async (audioSyncedUrl) => {
+                if (audioSyncedUrl && audioSyncedUrl !== result.video_url) {
+                  await supabase.from('generations').update({ video_url: audioSyncedUrl }).eq('id', generation.id);
+                  archiveVideo(audioSyncedUrl, req.user.id, generation.id).catch(() => {});
+                }
+              })
+              .catch(err => console.warn('[CharacterSwap] Audio re-mux notice:', err.message));
+          }
 
           // Archive final output permanently in 'videos' bucket
           archiveVideo(result.video_url, req.user.id, generation.id)
@@ -826,6 +857,18 @@ async function handleWebhookLogic(generationId, status, payload, errorMsg) {
         `Your video generation with "${gen.model_name}" has completed successfully.`,
         'success'
       );
+
+      // Automatically re-mux original audio soundtrack if source video exists (Zero Mute Reels)
+      if (gen.source_video_url) {
+        reMuxAudioFromSource(originalMediaUrl, gen.source_video_url, supabase, gen.user_id)
+          .then(async (audioSyncedUrl) => {
+            if (audioSyncedUrl && audioSyncedUrl !== originalMediaUrl) {
+              await supabase.from('generations').update({ video_url: audioSyncedUrl }).eq('id', generationId);
+              archiveVideo(audioSyncedUrl, gen.user_id, gen.id).catch(() => {});
+            }
+          })
+          .catch(err => console.warn('[WebhookLogic] Background audio re-muxing notice:', err.message));
+      }
 
       // Archive video permanently in the background
       archiveVideo(originalMediaUrl, gen.user_id, gen.id)

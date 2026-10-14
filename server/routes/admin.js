@@ -797,4 +797,98 @@ router.post('/upi-submissions/:id/reject', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/templates
+ * Lists all templates for admin management
+ */
+router.get('/templates', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('templates')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ templates: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/admin/templates
+ * Adds a new trending reel template to the database
+ */
+router.post('/templates', async (req, res) => {
+  try {
+    const {
+      title,
+      category = 'trending',
+      badge = '🔥 Viral Reel',
+      source_video_url,
+      preview_video_url,
+      preview_image_url,
+      audio_url,
+      prompt_recipe,
+      model_id = 'kling-3-omni',
+      duration = 15,
+      aspect_ratio = '9:16',
+      is_featured = false
+    } = req.body;
+
+    if (!title || !source_video_url) {
+      return res.status(400).json({ error: 'Title and Source Video URL are required.' });
+    }
+
+    const id = `tpl-${Date.now()}-${title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30)}`;
+
+    const newTemplate = {
+      id,
+      title,
+      category,
+      badge,
+      source_video_url,
+      preview_video_url: preview_video_url || source_video_url,
+      preview_image_url: preview_image_url || null,
+      audio_url: audio_url || null,
+      prompt_recipe: prompt_recipe || 'Exact character replacement of <<<video_1>>> with <<<image_1>>>, high fidelity motion transfer, photorealistic 8k',
+      model_id,
+      duration: parseInt(duration, 10) || 15,
+      aspect_ratio,
+      is_active: true,
+      is_featured: !!is_featured,
+      uses_count: 0
+    };
+
+    const { data, error } = await supabase
+      .from('templates')
+      .insert(newTemplate)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(201).json({ success: true, template: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/templates/:id
+ */
+router.delete('/templates/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase
+      .from('templates')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ success: true, message: 'Template deleted successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

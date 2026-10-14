@@ -47,6 +47,9 @@ export default function Topbar({
             <div className="flex items-center space-x-1 bg-surface-elevated px-2 py-1 rounded-xl border border-primary/40">
               <input
                 type="text"
+                id="topbar-title-input"
+                name="projectTitle"
+                aria-label="Project title"
                 value={editedTitle}
                 onChange={(e) => setEditedTitle(e.target.value)}
                 onBlur={handleRenameSubmit}

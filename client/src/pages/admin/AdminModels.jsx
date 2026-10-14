@@ -372,8 +372,10 @@ export default function AdminModels() {
               required
             />
             <div>
-              <label className="text-[10px] font-bold text-purple-300 uppercase tracking-widest block mb-1">Model Type</label>
+              <label htmlFor="admin-model-type" className="text-[10px] font-bold text-purple-300 uppercase tracking-widest block mb-1">Model Type</label>
               <select
+                id="admin-model-type"
+                name="modelType"
                 value={modelType}
                 onChange={(e) => setModelType(e.target.value)}
                 className="w-full bg-[#130E26] border border-purple-500/20 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-purple-500"
@@ -476,25 +478,29 @@ export default function AdminModels() {
 
           {/* Toggle buttons grid */}
           <div className="grid grid-cols-2 gap-4 bg-[#130E26]/50 p-3 rounded-xl border border-purple-500/5 select-none">
-            <div className="flex items-center justify-between text-xs font-semibold text-purple-300">
+            <label htmlFor="admin-supports-audio" className="flex items-center justify-between text-xs font-semibold text-purple-300 cursor-pointer">
               <span>Supports Audio</span>
               <input
                 type="checkbox"
+                id="admin-supports-audio"
+                name="supportsAudio"
                 checked={supportsAudio}
                 onChange={(e) => setSupportsAudio(e.target.checked)}
-                className="w-4 h-4 accent-purple-500 rounded"
+                className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
               />
-            </div>
+            </label>
             
-            <div className="flex items-center justify-between text-xs font-semibold text-purple-300">
+            <label htmlFor="admin-supports-image" className="flex items-center justify-between text-xs font-semibold text-purple-300 cursor-pointer">
               <span>Animate Image (I2V)</span>
               <input
                 type="checkbox"
+                id="admin-supports-image"
+                name="supportsImage"
                 checked={supportsImage}
                 onChange={(e) => setSupportsImage(e.target.checked)}
-                className="w-4 h-4 accent-purple-500 rounded"
+                className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
               />
-            </div>
+            </label>
           </div>
 
           <Button type="submit" isLoading={submitting} className="w-full uppercase font-bold text-xs py-2.5 shadow-premium">

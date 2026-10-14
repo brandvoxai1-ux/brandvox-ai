@@ -14,12 +14,13 @@ export function Input({
   name,
   ...props
 }) {
-  const generatedId = id || (label ? `input-${label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}` : undefined);
+  const fallbackId = React.useId();
+  const generatedId = id || (label ? `input-${label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}` : `input-${fallbackId.replace(/:/g, '')}`);
   const inputName = name || generatedId;
 
   return (
     <div className={`flex flex-col space-y-1.5 w-full ${className}`}>
-      {label && generatedId && (
+      {label && (
         <label 
           htmlFor={generatedId} 
           className="text-xs font-bold text-white/75 uppercase tracking-wider"
@@ -32,6 +33,7 @@ export function Input({
         id={generatedId}
         name={inputName}
         placeholder={placeholder}
+        aria-label={!label ? (props['aria-label'] || placeholder || inputName) : undefined}
         className={`bg-surface-elevated text-white border border-white/10 rounded-lg px-4 py-2.5 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder-white/50 ${
           error ? 'border-error/60 focus:ring-error/20' : ''
         }`}
@@ -55,12 +57,13 @@ export function Textarea({
   name,
   ...props
 }) {
-  const generatedId = id || (label ? `textarea-${label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}` : undefined);
+  const fallbackId = React.useId();
+  const generatedId = id || (label ? `textarea-${label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}` : `textarea-${fallbackId.replace(/:/g, '')}`);
   const textareaName = name || generatedId;
 
   return (
     <div className={`flex flex-col space-y-1.5 w-full ${className}`}>
-      {label && generatedId && (
+      {label && (
         <label 
           htmlFor={generatedId} 
           className="text-xs font-bold text-white/75 uppercase tracking-wider"
@@ -72,6 +75,7 @@ export function Textarea({
         id={generatedId}
         name={textareaName}
         placeholder={placeholder}
+        aria-label={!label ? (props['aria-label'] || placeholder || textareaName) : undefined}
         rows={rows}
         className={`bg-surface-elevated text-white border border-white/10 rounded-lg px-4 py-3 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder-white/50 resize-none ${
           error ? 'border-error/60 focus:ring-error/20' : ''
@@ -95,12 +99,13 @@ export function Select({
   name,
   ...props
 }) {
-  const generatedId = id || (label ? `select-${label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}` : undefined);
+  const fallbackId = React.useId();
+  const generatedId = id || (label ? `select-${label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}` : `select-${fallbackId.replace(/:/g, '')}`);
   const selectName = name || generatedId;
 
   return (
     <div className={`flex flex-col space-y-1.5 w-full ${className}`}>
-      {label && generatedId && (
+      {label && (
         <label 
           htmlFor={generatedId} 
           className="text-xs font-bold text-white/50 uppercase tracking-wider"
@@ -111,6 +116,7 @@ export function Select({
       <select
         id={generatedId}
         name={selectName}
+        aria-label={!label ? (props['aria-label'] || selectName) : undefined}
         className={`bg-surface-elevated text-white border border-white/10 rounded-lg px-4 py-2.5 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
           error ? 'border-error/60 focus:ring-error/20' : ''
         }`}

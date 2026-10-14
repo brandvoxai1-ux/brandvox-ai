@@ -95,7 +95,7 @@ async function processReferenceVideoBuffer(inputBuffer, mimeType = 'video/mp4', 
 
     const needsUpscale = width < 720 || height < 720;
     const needsLoop = duration < 2.0;
-    const needsDurationCap = maxDuration && duration > 10.0;
+    const needsDurationCap = maxDuration && duration > maxDuration;
     const needsSarFix = isNonSquareSar;
 
     if (!needsUpscale && !needsLoop && !needsDurationCap && !needsSarFix) {
@@ -175,7 +175,7 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, tar
 
   // All reference videos pass through universal conforming to ensure HD geometry (>=720px) and clean limits
   try {
-    const maxDuration = 10.0; // Kling 3.0 Omni maximum ceiling
+    const maxDuration = 30.0; // Support full viral reels up to 30 seconds
 
     console.log(`[videoProcessor] Checking compatibility for reference video: ${videoUrl} (target model: ${targetModelId || 'generic'})`);
     
@@ -221,8 +221,78 @@ async function ensureCompatibleReferenceVideoUrl(videoUrl, userId, supabase, tar
   }
 }
 
+/**
+ * Automatically re-muxes original audio from source reel onto the AI-generated video.
+ * Uses lightning-fast stream copy (-c:v copy) so no quality is lost and completes in < 2s.
+ * @param {string} aiVideoUrl - URL of generated video (may be mute or low quality audio)
+ * @param {string} sourceAudioOrVideoUrl - URL of source reel or extracted audio
+ * @param {object} supabase - Supabase client
+ * @param {string} userId - User ID for storage path
+ * @returns {Promise<string>} Public URL of final audio-synced video
+ */
+async function reMuxAudioFromSource(aiVideoUrl, sourceAudioOrVideoUrl, supabase, userId = 'system') {
+  if (!aiVideoUrl || !sourceAudioOrVideoUrl) return aiVideoUrl;
+
+  const tempId = `remux_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const aiPath = path.join(os.tmpdir(), `${tempId}_ai.mp4`);
+  const srcPath = path.join(os.tmpdir(), `${tempId}_src.mp4`);
+  const outPath = path.join(os.tmpdir(), `${tempId}_synced.mp4`);
+
+  try {
+    console.log(`[videoProcessor] Starting audio re-mux: AI video (${aiVideoUrl.slice(0, 50)}...) with sound from (${sourceAudioOrVideoUrl.slice(0, 50)}...)`);
+
+    // Download both files concurrently
+    const [aiRes, srcRes] = await Promise.all([
+      axios.get(aiVideoUrl, { responseType: 'arraybuffer', timeout: 35000 }),
+      axios.get(sourceAudioOrVideoUrl, { responseType: 'arraybuffer', timeout: 35000 })
+    ]);
+
+    fs.writeFileSync(aiPath, Buffer.from(aiRes.data));
+    fs.writeFileSync(srcPath, Buffer.from(srcRes.data));
+
+    // Mux AI video frames + Source audio track
+    const ffmpegCmd = `"${ffmpegPath}" -y -i "${aiPath}" -i "${srcPath}" -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -shortest "${outPath}"`;
+    console.log(`[videoProcessor] Executing audio re-mux command: ${ffmpegCmd}`);
+
+    await execWithTimeout(ffmpegCmd, 25000);
+
+    if (fs.existsSync(outPath) && fs.statSync(outPath).size > 1000) {
+      const syncedBuffer = fs.readFileSync(outPath);
+      const filename = `${userId}/reel_sound_synced_${Date.now()}.mp4`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('uploads')
+        .upload(filename, syncedBuffer, {
+          contentType: 'video/mp4',
+          upsert: true
+        });
+
+      if (!uploadErr) {
+        const { data: { publicUrl } } = supabase.storage
+          .from('uploads')
+          .getPublicUrl(filename);
+
+        console.log(`[videoProcessor] Audio re-mux successful! Final synced reel: ${publicUrl}`);
+        return publicUrl;
+      }
+    }
+
+    return aiVideoUrl;
+  } catch (err) {
+    console.warn('[videoProcessor] Audio re-mux failed, falling back to original AI video:', err.message);
+    return aiVideoUrl;
+  } finally {
+    try {
+      if (fs.existsSync(aiPath)) fs.unlinkSync(aiPath);
+      if (fs.existsSync(srcPath)) fs.unlinkSync(srcPath);
+      if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
+    } catch (_) {}
+  }
+}
+
 module.exports = {
   probeVideo,
   processReferenceVideoBuffer,
-  ensureCompatibleReferenceVideoUrl
+  ensureCompatibleReferenceVideoUrl,
+  reMuxAudioFromSource
 };

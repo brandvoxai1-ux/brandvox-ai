@@ -168,7 +168,7 @@ export default function AdminSettings() {
 
         {/* Connected API checks */}
         <div className="space-y-3 pt-4 border-t border-purple-500/5 select-none">
-          <label className="text-[10px] font-bold text-purple-300/40 uppercase tracking-widest block">API Channels Check</label>
+          <span className="text-[10px] font-bold text-purple-300/40 uppercase tracking-widest block">API Channels Check</span>
           <div className="grid grid-cols-2 gap-4 text-[10.5px]">
             <div className="bg-[#130E26] px-3.5 py-2.5 rounded-lg flex items-center justify-between border border-purple-500/5">
               <span className="font-semibold text-white/60">Replicate AI Integration</span>
