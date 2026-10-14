@@ -45,7 +45,7 @@ const REPLICATE_MODEL_MAP = {
   'wan-video/wan-2.1-14b': 'wan-video/wan-2.1-1.3b',
   'wan-video/wan-2.1': 'wan-video/wan-2.1-1.3b',
   'wan-3': 'wan-video/wan-2.1-1.3b',
-  'fal-ai/hunyuan-video': 'wan-video/wan-2.1-1.3b',
+  'fal-ai/hunyuan-video': 'bytedance/seedance-2.5',
   'seedance-2-0-fast': 'bytedance/seedance-2.5',
   'seedance-2-fast': 'bytedance/seedance-2.5',
   'seedance-2': 'bytedance/seedance-2.5',
@@ -64,6 +64,12 @@ const REPLICATE_MODEL_MAP = {
  */
 function resolveReplicateModel(endpoint, defaultModel = 'black-forest-labs/flux-schnell') {
   if (!endpoint) return defaultModel;
+  
+  // Bulletproof interceptor: Any endpoint referring to Seedance must resolve to Seedance 2.5
+  if (typeof endpoint === 'string' && endpoint.toLowerCase().includes('seedance')) {
+    return 'bytedance/seedance-2.5';
+  }
+
   if (REPLICATE_MODEL_MAP[endpoint]) {
     return REPLICATE_MODEL_MAP[endpoint];
   }
@@ -365,8 +371,12 @@ async function generateCharacterSwapVideo({
  * @param {Object} params
  * @returns {Promise<{ video_url?: string, request_id?: string }>}
  */
-async function generateVideo({ endpoint, prompt, duration, resolution, aspect_ratio, generate_audio, image_url, webhookUrl, generationId }) {
-  const model = resolveReplicateModel(endpoint, 'minimax/video-01');
+async function generateVideo({ endpoint, modelId, prompt, duration, resolution, aspect_ratio, generate_audio, image_url, webhookUrl, generationId }) {
+  let modelCandidate = endpoint;
+  if ((modelId && String(modelId).toLowerCase().includes('seedance')) || (endpoint && String(endpoint).toLowerCase().includes('seedance'))) {
+    modelCandidate = 'bytedance/seedance-2.5';
+  }
+  const model = resolveReplicateModel(modelCandidate, 'bytedance/seedance-2.5');
 
   const { sanitizePromptForVideo } = require('./promptSanitizer');
   const cleanPrompt = sanitizePromptForVideo(prompt);

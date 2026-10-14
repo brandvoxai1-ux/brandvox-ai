@@ -39,7 +39,7 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
     let { data: model, error: modelErr } = await supabase
       .from('models')
       .select('*')
-      .eq('id', model_id || 'seedance-2')
+      .eq('id', model_id || 'seedance-2.5')
       .eq('is_active', true)
       .single();
 
@@ -110,6 +110,7 @@ router.post('/', authMiddleware, generationLimiter, async (req, res) => {
     try {
       result = await replicateService.generateVideo({
         endpoint: model.fal_endpoint,
+        modelId: model.id,
         prompt: effectivePrompt,
         duration: selectedDuration,
         resolution: resolution || model.supported_resolutions?.[0],

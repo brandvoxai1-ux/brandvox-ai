@@ -1054,7 +1054,9 @@ export default function Studio() {
                 toast('MiniMax Hailuo generates fixed 6s video clips', { icon: 'ℹ️' });
                 return;
               }
-              let options = [5, 10, 15, 20, 30];
+              const maxDur = Number(selectedModel?.max_duration) || 30;
+              let options = [5, 10, 15, 20, 30].filter(d => d <= maxDur);
+              if (options.length === 0) options = [5];
 
               const currentIdx = options.indexOf(duration);
               const next = options[(currentIdx + 1) % options.length] || options[0];
