@@ -25,15 +25,23 @@ app.use(helmet({
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (!process.env.CLIENT_URL) return callback(null, true);
-    const clientClean = process.env.CLIENT_URL.replace(/\/$/, '');
-    if (origin === clientClean || origin.includes('localhost') || origin.endsWith('.netlify.app')) {
+    const clientClean = process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/\/$/, '') : null;
+    if (
+      !clientClean ||
+      origin === clientClean ||
+      origin.includes('localhost') ||
+      origin.endsWith('.pages.dev') ||
+      origin.endsWith('.netlify.app')
+    ) {
       return callback(null, true);
     }
     return callback(null, true);
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+app.options('*', cors());
 
 
 
